@@ -1,5 +1,7 @@
 import timaccop 
 from Crypto.Cipher import AES
+from collections import namedtuple
+import struct
 
 masterkey = bytearray(bytes.fromhex("D306D9348E29E5E358BF2934812002C1"))
 
@@ -37,27 +39,110 @@ def send_data(dst, data):
     #print("out:", out.hex())
     timaccop.mac_data_req(dst, PANID, 12, dsn, out)
 
+def process_assoc(pkt, data):
+    TagInfo = namedtuple('TagInfo', """
+    protoVer,
+    swVer,
+    hwType,
+    batteryMv,
+    rfu1,
+    screenPixWidth,
+    screenPixHeight,
+    screenMmWidth,
+    screenMmHeight,
+    compressionsSupported,
+    maxWaitMsec,
+    screenType,
+    rfu
+    """)
+    ti = TagInfo._make(struct.unpack('<BQHHBHHHHHHB11s',data))
+    print(ti)
+
+    AssocInfo = namedtuple('AssocInfo', """
+    checkinDelay,
+    retryDelay,
+    failedCheckinsTillBlank,
+    failedCheckinsTillDissoc,
+    newKey,
+    rfu
+    """)
+    ai = AssocInfo(
+	    checkinDelay=10000, #check each 10sec 
+	    retryDelay=1000, #retry delay 1000ms
+	    failedCheckinsTillBlank=4,
+	    failedCheckinsTillDissoc=10000,
+	    newKey=masterkey,
+	    rfu=bytearray(8*[0])
+    )
+    ai_pkt = bytearray([ PKT_ASSOC_RESP ]) + bytearray(struct.pack('<LLHH16s8s', *ai))
+
+    send_data(pkt['src_add'], ai_pkt)
+
+def process_checkin(pkt, data):
+    CheckinInfo = namedtuple('CheckinInfo', """
+    swVer,
+    hwType,
+    batteryMv,
+    lastPacketLQI,
+    lastPacketRSSI,
+    temperature,
+    rfu,
+    """)
+    ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
+    print(ci)
+
+    PendingInfo = namedtuple('PendingInfo', """
+    imgUpdateVer,
+    imgUpdateSize,
+    osUpdateVer,
+    osUpdateSize,
+    rfu
+    """)
+    pi = PendingInfo(
+        imgUpdateVer = 0x0000010000000009,
+        imgUpdateSize = 100,
+        osUpdateVer = ci.swVer,
+        osUpdateSize = 0,
+	    rfu=bytearray(8*[0])
+    )
+
+    pi_pkt = bytearray([ PKT_CHECKOUT ]) + bytearray(struct.pack('<QLQL8s', *pi))
+
+    send_data(pkt['src_add'], pi_pkt)
+
+def process_download(pkt, data):
+    ChunkReqInfo = namedtuple('ChunkReqInfo', """
+    versionRequested,
+    offset,
+    len,
+    osUpdatePlz,
+    rfu,
+    """)
+    cri = ChunkReqInfo._make(struct.unpack('<QLBB6s',data))
+    print(cri)
+
 def process_pkt(pkt):
+    bcast = True
     sz = pkt['length']
-    hdr = bytearray.fromhex("01c8")
+    if pkt['dst_add'] == [ 0xff, 0xff ]: #broadcast assoc
+        hdr = bytearray.fromhex("01c8")
+    else:
+        hdr = bytearray.fromhex("41cc")
+        bcast = False
     hdr.append(pkt['dsn'])
     hdr.extend(pkt['dst_pan_id'])
-    hdr.extend(reversed(pkt['dst_add']))
-    hdr.extend(pkt['src_pan_id'])
+    hdr.extend(pkt['dst_add'])
+    if bcast:
+        hdr.extend(pkt['src_pan_id'])
     hdr.extend(reversed(pkt['src_add']))
-    #print(hdr.hex())
 
     nonce = bytearray(pkt['data'][sz-4:])
     nonce.extend(reversed(pkt['src_add']))
     nonce.extend(b'\x00')
-    #print(nonce.hex())
 
-    #print(pkt['data'].hex())
     tag = pkt['data'][sz-8:sz-4]
-    #print(tag.hex())
 
     ciphertext = pkt['data'][:sz-8]
-    #print(ciphertext.hex())
 
     cipher = AES.new(masterkey, AES.MODE_CCM, nonce, mac_len=4)
     cipher.update(hdr)
@@ -67,6 +152,11 @@ def process_pkt(pkt):
         cipher.verify(tag)
         print("packet is authentic")
     except:
+        print("data", pkt['data'].hex())
+        print("hdr", hdr.hex())
+        print("ciph", ciphertext.hex())
+        print("nonce", nonce.hex())
+        print("tag", tag.hex())
         print("packet is NOT authentic")
         return
 
@@ -74,8 +164,15 @@ def process_pkt(pkt):
 
     if typ == PKT_ASSOC_REQ:
         print("Got assoc request")
+        process_assoc(pkt, plaintext[1:])
+    elif typ == PKT_CHECKIN:
+        print("Got checkin request")
+        process_checkin(pkt, plaintext[1:])
+    elif typ == PKT_CHUNK_REQ:
+        print("Got chunk request")
+        process_download(pkt, plaintext[1:])
     else:
-        print("Unknown request")
+        print("Unknown request", typ)
 
     #send response
     send_data(pkt["src_add"], 32*b"\x00")
