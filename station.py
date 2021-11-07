@@ -2,8 +2,10 @@ import timaccop
 from Crypto.Cipher import AES
 from collections import namedtuple
 import struct
+import os
 
 masterkey = bytearray(bytes.fromhex("D306D9348E29E5E358BF2934812002C1"))
+filename = "/storage/Projects/eink-display/einkTags_0001/dmitrygr-eink/imgTools/conv.bmp"
 
 SHORT_ADDRESS = [ 0x49, 0x35 ]
 EXTENDED_ADDRESS = [ 0x35, 0x49, 0xD9, 0x14, 0x00, 0x4B, 0x12, 0x00 ] #reversed
@@ -69,8 +71,8 @@ def process_assoc(pkt, data):
     ai = AssocInfo(
 	    checkinDelay=10000, #check each 10sec 
 	    retryDelay=1000, #retry delay 1000ms
-	    failedCheckinsTillBlank=4,
-	    failedCheckinsTillDissoc=10000,
+	    failedCheckinsTillBlank=2,
+	    failedCheckinsTillDissoc=4,
 	    newKey=masterkey,
 	    rfu=bytearray(8*[0])
     )
@@ -99,8 +101,8 @@ def process_checkin(pkt, data):
     rfu
     """)
     pi = PendingInfo(
-        imgUpdateVer = 0x0000010000000009,
-        imgUpdateSize = 100,
+        imgUpdateVer = 0x0000010000000011,
+        imgUpdateSize = os.path.getsize(filename),
         osUpdateVer = ci.swVer,
         osUpdateSize = 0,
 	    rfu=bytearray(8*[0])
@@ -121,10 +123,32 @@ def process_download(pkt, data):
     cri = ChunkReqInfo._make(struct.unpack('<QLBB6s',data))
     print(cri)
 
+    ChunkInfo = namedtuple('ChunkInfo', """
+    offset,
+    osUpdatePlz,
+    rfu,
+    """)
+    ci = ChunkInfo(
+        offset = cri.offset,
+        osUpdatePlz = 0,
+        rfu = 0,
+    )
+
+    with open(filename, "rb") as f:
+        f.seek(cri.offset)
+        fdata = f.read(cri.len)
+
+    outpkt = bytearray([ PKT_CHUNK_RESP ]) + bytearray(struct.pack('<LBB', *ci)) + bytearray(fdata)
+
+    print("sending chunk", len(outpkt), outpkt)
+
+    send_data(pkt['src_add'], outpkt)
+
+
 def process_pkt(pkt):
     bcast = True
     sz = pkt['length']
-    if pkt['dst_add'] == [ 0xff, 0xff ]: #broadcast assoc
+    if pkt['dst_add'] == b'\xff\xff': #broadcast assoc
         hdr = bytearray.fromhex("01c8")
     else:
         hdr = bytearray.fromhex("41cc")
