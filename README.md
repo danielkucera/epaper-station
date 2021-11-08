@@ -5,3 +5,8 @@ Contains PC based controll software for epaper display protocol by @dmitrygr (ht
 Needs 802.15.4 CC2531 dongle with TIMAC firmware: https://www.ti.com/tool/TIMAC
 
 Display firmware: https://github.com/danielkucera/epaper-firmware
+
+Run:
+```
+python3 station.py
+```
