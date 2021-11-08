@@ -101,7 +101,7 @@ def process_checkin(pkt, data):
     rfu
     """)
     pi = PendingInfo(
-        imgUpdateVer = 0x0000010000000011,
+        imgUpdateVer = 1, #increment on image change
         imgUpdateSize = os.path.getsize(filename),
         osUpdateVer = ci.swVer,
         osUpdateSize = 0,
