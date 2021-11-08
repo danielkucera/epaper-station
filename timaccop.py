@@ -84,20 +84,20 @@ def await_res():
     frm = head + data
     ccs = fcs(frm)
     cs = ser.read(1)[0]
-    print("R:", (bytes([pre])+frm+bytes([cs])).hex())
+    #print("R:", (bytes([pre])+frm+bytes([cs])).hex())
     if cs != ccs:
         print("incorrect fcs, expected", ccs, "got", cs)
     return frm
 
 def send_sreq(data):
     fr = frame(data)
-    print("W:", fr.hex())
+    #print("W:", fr.hex())
     ser.write(fr)
     return await_res()
 
 def send_areq(data):
     fr = frame(data)
-    print("W:", fr)
+    #print("W:", fr)
     ser.write(fr)
 
 def mac_set_req(attribute, value):
@@ -107,7 +107,7 @@ def mac_set_req(attribute, value):
 
 def mac_get_req(attribute):
     res = send_sreq(MAC_GET_REQ + [attribute])
-    print(res[4:].hex())
+    #print(res[4:].hex())
     return res
 
 def mac_start_req():
@@ -233,12 +233,13 @@ def parse_areq(data):
     if cmd0 == 0x42 and cmd1 == 0x84:
         pkt = parse_mac_data_cnf(data)
     if pkt:
-        print("Got cmd\n", pkt)
+        #print("Got cmd\n", pkt)
         if pkt["type"] == "mac_data_cnf":
             #sys.exit(0)
             pass
     else:
-        print("Unknown cmd\n", data)
+        #print("Unknown cmd\n", data)
+        pass
 
 def init(pk):
     global pkt_callback
