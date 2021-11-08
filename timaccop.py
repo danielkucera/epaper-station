@@ -9,6 +9,7 @@ PANID = [ 0x47, 0x44 ]
 CHANNEL = 11
 
 ser = serial.Serial('/dev/ttyACM0', timeout=1)
+ser.flushInput()
 
 ZMAC_ACK_WAIT_DURATION	=	0x40
 ZMAC_ASSOCIATION_PERMIT	=	0x41
