@@ -8,10 +8,16 @@ Display firmware: https://github.com/danielkucera/epaper-firmware
 
 ## Install
 ```
-apt install python3-serial python3-pycryptodome python3-pil
+apt install python3-serial python3-crypto python3-pil
 ```
 
 ## Run
 ```
 python3 station.py
 ```
+
+## Usage
+
+- to pair a display, it has to be really really close (touching the adapter with left edge)
+- when the display "checks in", it will check the presence of <DISPLAY_MAC>.png in current dir, convert it to bmp and send to display
+  - if the image doesn't change, the display will stay as is and checks back again in defined interval (`checkinDelay`)
