@@ -1,5 +1,5 @@
 import timaccop 
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 from collections import namedtuple
 import struct
 import os

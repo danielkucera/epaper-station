@@ -8,7 +8,7 @@ Display firmware: https://github.com/danielkucera/epaper-firmware
 
 ## Install
 ```
-apt install python3-serial python3-crypto python3-pil
+apt install python3-serial python3-pycryptodome python3-pil
 ```
 
 ## Run
