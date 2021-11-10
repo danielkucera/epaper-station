@@ -3,13 +3,18 @@ from Crypto.Cipher import AES
 from collections import namedtuple
 import struct
 import os
+import logging
 
 masterkey = bytearray(bytes.fromhex("D306D9348E29E5E358BF2934812002C1"))
 filename = "/storage/Projects/eink-display/einkTags_0001/dmitrygr-eink/imgTools/conv.bmp"
 
-SHORT_ADDRESS = [ 0x49, 0x35 ]
-EXTENDED_ADDRESS = [ 0x35, 0x49, 0xD9, 0x14, 0x00, 0x4B, 0x12, 0x00 ] #reversed
+dsn = 0
+imgVer = 1
+
+PORT = "/dev/ttyACM0"
+EXTENDED_ADDRESS = [ 0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35 ]
 PANID = [ 0x47, 0x44 ]
+CHANNEL = 11
 
 PKT_ASSOC_REQ			= (0xF0)
 PKT_ASSOC_RESP			= (0xF1)
@@ -18,18 +23,85 @@ PKT_CHECKOUT			= (0xF3)
 PKT_CHUNK_REQ			= (0xF4)
 PKT_CHUNK_RESP			= (0xF5)
 
+
+TagInfo = namedtuple('TagInfo', """
+protoVer,
+swVer,
+hwType,
+batteryMv,
+rfu1,
+screenPixWidth,
+screenPixHeight,
+screenMmWidth,
+screenMmHeight,
+compressionsSupported,
+maxWaitMsec,
+screenType,
+rfu
+""")
+
+AssocInfo = namedtuple('AssocInfo', """
+checkinDelay,
+retryDelay,
+failedCheckinsTillBlank,
+failedCheckinsTillDissoc,
+newKey,
+rfu
+""")
+
+CheckinInfo = namedtuple('CheckinInfo', """
+swVer,
+hwType,
+batteryMv,
+lastPacketLQI,
+lastPacketRSSI,
+temperature,
+rfu,
+""")
+
+PendingInfo = namedtuple('PendingInfo', """
+imgUpdateVer,
+imgUpdateSize,
+osUpdateVer,
+osUpdateSize,
+rfu
+""")
+
+ChunkReqInfo = namedtuple('ChunkReqInfo', """
+versionRequested,
+offset,
+len,
+osUpdatePlz,
+rfu,
+""")
+
+ChunkInfo = namedtuple('ChunkInfo', """
+offset,
+osUpdatePlz,
+rfu,
+""")
+
+logging.basicConfig(format='%(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
+
+def print(*args):
+    logger.warning(args)
+
 def send_data(dst, data):
-    dsn = 0 #TODO: increment
+    global dsn
+    dsn += 1
+    if dsn > 255:
+        dsn = 0
     hdr = bytearray.fromhex("41cc")
     hdr.append(dsn)
     hdr.extend(PANID)
     hdr.extend(reversed(dst))
-    hdr.extend(EXTENDED_ADDRESS)
+    hdr.extend(reversed(EXTENDED_ADDRESS))
     #print("hdr:", hdr.hex())
 
     cntr = bytearray.fromhex("00000000")
     nonce = bytearray.fromhex("00000000")
-    nonce.extend(EXTENDED_ADDRESS)
+    nonce.extend(reversed(EXTENDED_ADDRESS))
     nonce.append(0)
     #print("nonce:", nonce.hex())
 
@@ -42,97 +114,52 @@ def send_data(dst, data):
     timaccop.mac_data_req(dst, PANID, 12, dsn, out)
 
 def process_assoc(pkt, data):
-    TagInfo = namedtuple('TagInfo', """
-    protoVer,
-    swVer,
-    hwType,
-    batteryMv,
-    rfu1,
-    screenPixWidth,
-    screenPixHeight,
-    screenMmWidth,
-    screenMmHeight,
-    compressionsSupported,
-    maxWaitMsec,
-    screenType,
-    rfu
-    """)
     ti = TagInfo._make(struct.unpack('<BQHHBHHHHHHB11s',data))
     print(ti)
 
-    AssocInfo = namedtuple('AssocInfo', """
-    checkinDelay,
-    retryDelay,
-    failedCheckinsTillBlank,
-    failedCheckinsTillDissoc,
-    newKey,
-    rfu
-    """)
     ai = AssocInfo(
-	    checkinDelay=10000, #check each 10sec 
+	    checkinDelay=900000, #check each 900sec 
 	    retryDelay=1000, #retry delay 1000ms
 	    failedCheckinsTillBlank=2,
-	    failedCheckinsTillDissoc=4,
+	    failedCheckinsTillDissoc=0,
 	    newKey=masterkey,
 	    rfu=bytearray(8*[0])
     )
+    print(ai)
     ai_pkt = bytearray([ PKT_ASSOC_RESP ]) + bytearray(struct.pack('<LLHH16s8s', *ai))
 
     send_data(pkt['src_add'], ai_pkt)
 
 def process_checkin(pkt, data):
-    CheckinInfo = namedtuple('CheckinInfo', """
-    swVer,
-    hwType,
-    batteryMv,
-    lastPacketLQI,
-    lastPacketRSSI,
-    temperature,
-    rfu,
-    """)
     ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
     print(ci)
 
-    PendingInfo = namedtuple('PendingInfo', """
-    imgUpdateVer,
-    imgUpdateSize,
-    osUpdateVer,
-    osUpdateSize,
-    rfu
-    """)
+    global imgVer
+    #imgVer += 1
+
     pi = PendingInfo(
-        imgUpdateVer = 1, #increment on image change
+        imgUpdateVer = imgVer, #increment on image change
         imgUpdateSize = os.path.getsize(filename),
         osUpdateVer = ci.swVer,
         osUpdateSize = 0,
 	    rfu=bytearray(8*[0])
     )
+    print(pi)
 
     pi_pkt = bytearray([ PKT_CHECKOUT ]) + bytearray(struct.pack('<QLQL8s', *pi))
 
     send_data(pkt['src_add'], pi_pkt)
 
 def process_download(pkt, data):
-    ChunkReqInfo = namedtuple('ChunkReqInfo', """
-    versionRequested,
-    offset,
-    len,
-    osUpdatePlz,
-    rfu,
-    """)
     cri = ChunkReqInfo._make(struct.unpack('<QLBB6s',data))
     print(cri)
 
-    ChunkInfo = namedtuple('ChunkInfo', """
-    offset,
-    osUpdatePlz,
-    rfu,
-    """)
     ci = ChunkInfo(
         offset = cri.offset,
         osUpdatePlz = 0,
         rfu = 0,
     )
+    print(ci)
 
     with open(filename, "rb") as f:
         f.seek(cri.offset)
@@ -144,10 +171,8 @@ def process_download(pkt, data):
 
     send_data(pkt['src_add'], outpkt)
 
-
-def process_pkt(pkt):
+def generate_pkt_header(pkt): #hacky- timaccop cannot provide header data
     bcast = True
-    sz = pkt['length']
     if pkt['dst_add'] == b'\xff\xff': #broadcast assoc
         hdr = bytearray.fromhex("01c8")
     else:
@@ -160,21 +185,25 @@ def process_pkt(pkt):
         hdr.extend(pkt['src_pan_id'])
     hdr.extend(reversed(pkt['src_add']))
 
-    nonce = bytearray(pkt['data'][sz-4:])
+    return hdr
+
+def process_pkt(pkt):
+    hdr = generate_pkt_header(pkt)
+
+    nonce = bytearray(pkt['data'][-4:])
     nonce.extend(reversed(pkt['src_add']))
     nonce.extend(b'\x00')
 
-    tag = pkt['data'][sz-8:sz-4]
+    tag = pkt['data'][-8:-4]
 
-    ciphertext = pkt['data'][:sz-8]
+    ciphertext = pkt['data'][:-8]
 
     cipher = AES.new(masterkey, AES.MODE_CCM, nonce, mac_len=4)
     cipher.update(hdr)
     plaintext = cipher.decrypt(ciphertext)
-    print("rcvd_packet:", plaintext.hex())
+    #print("rcvd_packet:", plaintext.hex())
     try:
         cipher.verify(tag)
-        print("packet is authentic")
     except:
         print("data", pkt['data'].hex())
         print("hdr", hdr.hex())
@@ -198,11 +227,8 @@ def process_pkt(pkt):
     else:
         print("Unknown request", typ)
 
-    #send response
-    send_data(pkt["src_add"], 32*b"\x00")
-
-timaccop.init(process_pkt)
+timaccop.init(PORT, PANID, CHANNEL, EXTENDED_ADDRESS, process_pkt)
+print("Station started")
 
 timaccop.run()
 
-ser.close()

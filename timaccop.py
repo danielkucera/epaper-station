@@ -1,15 +1,4 @@
 import serial
-import sys
-
-SHORT_ADDRESS = [ 0x49, 0x35 ]
-#EXTENDED_ADDRESS = [ 0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35 ]
-EXTENDED_ADDRESS = [ 0x35, 0x49, 0xD9, 0x14, 0x00, 0x4B, 0x12, 0x00 ]
-PANID = [ 0x47, 0x44 ]
-#CHANNEL = int(sys.argv[1])
-CHANNEL = 11
-
-ser = serial.Serial('/dev/ttyACM0', timeout=1)
-ser.flushInput()
 
 ZMAC_ACK_WAIT_DURATION	=	0x40
 ZMAC_ASSOCIATION_PERMIT	=	0x41
@@ -54,6 +43,7 @@ MAC_START_REQ = [ 0x23, 0x22, 0x03 ]
 UTIL_CALLBACK_SUB_CMD = [ 0x03, 0x27, 0x06, 0xff, 0xff, 1 ]
 
 pkt_callback = None
+ser = None
 
 def fcs(data):
     cs = 0
@@ -110,10 +100,10 @@ def mac_get_req(attribute):
     #print(res[4:].hex())
     return res
 
-def mac_start_req():
+def mac_start_req(panid, channel):
     start_time = [0]*4
-    pan_id = PANID
-    logical_channel = CHANNEL
+    pan_id = panid
+    logical_channel = channel
     channel_page = 0
     beacon_order = 15
     super_frame_order = 0
@@ -167,7 +157,7 @@ def mac_data_req(dst_add, dst_panid, handle, dsn, data):
     data = list(data)
     src_add_mode = 3
     tx_option = 0 # + MAC_TXOPTION_PWR_CHAN
-    logical_channel = CHANNEL
+    logical_channel = 0
     power = 127
     key_source = [0]*8
     security_level = 0
@@ -241,32 +231,36 @@ def parse_areq(data):
         #print("Unknown cmd\n", data)
         pass
 
-def init(pk):
+def init(port, pan_id, channel, ext_add, pk):
     global pkt_callback
     pkt_callback = pk
+
+    global ser
+    ser = serial.Serial(port, timeout=1)
+    ser.flushInput()
+
+    ext_add.reverse()
+    short_add = ext_add[-2:]
+
     send_sreq(MAC_INIT)
     send_sreq(MAC_RESET_REQ)
     
     # https://e2e.ti.com/support/wireless-connectivity/zigbee-thread-group/zigbee-and-thread/f/zigbee-thread-forum/426380/ti-mac-cop-cc2531-asynchronous-responses
     send_sreq(UTIL_CALLBACK_SUB_CMD)
     
-    mac_set_req(ZMAC_EXTENDED_ADDRESS, EXTENDED_ADDRESS)
-    mac_set_req(ZMAC_SHORT_ADDRESS, SHORT_ADDRESS)
+    mac_set_req(ZMAC_EXTENDED_ADDRESS, ext_add)
+    mac_set_req(ZMAC_SHORT_ADDRESS, short_add)
     mac_get_req(ZMAC_EXTENDED_ADDRESS)
     mac_get_req(ZMAC_SHORT_ADDRESS)
     
-    print("Rx on idle:")
     mac_set_req(ZMAC_RX_ON_IDLE, 1)
     mac_get_req(ZMAC_RX_ON_IDLE)
-    print("Promisc:")
     mac_set_req(ZMAC_PROMISCUOUS_MODE, 1)
     mac_get_req(ZMAC_PROMISCUOUS_MODE)
-    print("Channel:")
     mac_get_req(ZMAC_LOGICAL_CHANNEL)
-    print("Security:")
     mac_get_req(ZMAC_SECURITY_ENABLED)
     
-    mac_start_req()
+    mac_start_req(pan_id, channel)
     
 def run():    
     while True:
