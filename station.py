@@ -142,9 +142,10 @@ def process_assoc(pkt, data):
     send_data(pkt['src_add'], ai_pkt)
 
 def get_image_data(client):
-    filename = "/storage/Projects/eink-display/einkTags_0001/dmitrygr-eink/imgTools/orig.bmp"
+    filename = bytes(client).hex() + ".png"
+    print("Reading image file:", filename)
 
-    file_conv = "image.bmp"
+    file_conv = filename + ".bmp"
 
     im = Image.open(filename)
     im_L = im.convert("1")
