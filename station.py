@@ -4,12 +4,10 @@ from collections import namedtuple
 import struct
 import os
 import logging
+from PIL import Image
+import binascii
 
-masterkey = bytearray(bytes.fromhex("D306D9348E29E5E358BF2934812002C1"))
-filename = "/storage/Projects/eink-display/einkTags_0001/dmitrygr-eink/imgTools/conv.bmp"
-
-dsn = 0
-imgVer = 1
+masterkey = bytearray.fromhex("D306D9348E29E5E358BF2934812002C1")
 
 PORT = "/dev/ttyACM0"
 EXTENDED_ADDRESS = [ 0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35 ]
@@ -84,8 +82,22 @@ rfu,
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger(__name__)
 
+dsn = 0
+
 def print(*args):
     logger.warning(args)
+
+def decrypt(hdr, enc, tag, nonce):
+    cipher = AES.new(masterkey, AES.MODE_CCM, nonce, mac_len=4)
+    cipher.update(hdr)
+    plaintext = cipher.decrypt(enc)
+    #print("rcvd_packet:", plaintext.hex())
+    #print("rcvhdr:", hdr.hex())
+    try:
+        cipher.verify(tag)
+        return plaintext
+    except:
+        return None
 
 def send_data(dst, data):
     global dsn
@@ -96,12 +108,12 @@ def send_data(dst, data):
     hdr.append(dsn)
     hdr.extend(PANID)
     hdr.extend(reversed(dst))
-    hdr.extend(reversed(EXTENDED_ADDRESS))
+    hdr.extend(EXTENDED_ADDRESS)
     #print("hdr:", hdr.hex())
 
     cntr = bytearray.fromhex("00000000")
     nonce = bytearray.fromhex("00000000")
-    nonce.extend(reversed(EXTENDED_ADDRESS))
+    nonce.extend(EXTENDED_ADDRESS)
     nonce.append(0)
     #print("nonce:", nonce.hex())
 
@@ -110,7 +122,6 @@ def send_data(dst, data):
     ciphertext, tag = cipher.encrypt_and_digest(data)
 
     out = ciphertext+tag+cntr
-    #print("out:", out.hex())
     timaccop.mac_data_req(dst, PANID, 12, dsn, out)
 
 def process_assoc(pkt, data):
@@ -130,16 +141,32 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
+def get_image_data(client):
+    filename = "/storage/Projects/eink-display/einkTags_0001/dmitrygr-eink/imgTools/orig.bmp"
+
+    file_conv = "image.bmp"
+
+    im = Image.open(filename)
+    im_L = im.convert("1")
+    im_L.save(file_conv)
+
+    f = open(file_conv,mode='rb')
+    image_data = f.read()
+    f.close()
+
+    print(len(image_data))
+    return image_data
+
 def process_checkin(pkt, data):
     ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
     print(ci)
 
-    global imgVer
-    #imgVer += 1
+    image_data = get_image_data(pkt['src_add'])
+    imgVer = binascii.crc32(image_data)
 
     pi = PendingInfo(
         imgUpdateVer = imgVer, #increment on image change
-        imgUpdateSize = os.path.getsize(filename),
+        imgUpdateSize = len(image_data),
         osUpdateVer = ci.swVer,
         osUpdateSize = 0,
 	    rfu=bytearray(8*[0])
@@ -161,9 +188,8 @@ def process_download(pkt, data):
     )
     print(ci)
 
-    with open(filename, "rb") as f:
-        f.seek(cri.offset)
-        fdata = f.read(cri.len)
+    image_data = get_image_data(pkt['src_add'])
+    fdata = image_data[cri.offset:cri.offset+cri.len]
 
     outpkt = bytearray([ PKT_CHUNK_RESP ]) + bytearray(struct.pack('<LBB', *ci)) + bytearray(fdata)
 
@@ -187,6 +213,7 @@ def generate_pkt_header(pkt): #hacky- timaccop cannot provide header data
 
     return hdr
 
+
 def process_pkt(pkt):
     hdr = generate_pkt_header(pkt)
 
@@ -198,13 +225,8 @@ def process_pkt(pkt):
 
     ciphertext = pkt['data'][:-8]
 
-    cipher = AES.new(masterkey, AES.MODE_CCM, nonce, mac_len=4)
-    cipher.update(hdr)
-    plaintext = cipher.decrypt(ciphertext)
-    #print("rcvd_packet:", plaintext.hex())
-    try:
-        cipher.verify(tag)
-    except:
+    plaintext = decrypt(hdr, ciphertext, tag, nonce)
+    if not plaintext:
         print("data", pkt['data'].hex())
         print("hdr", hdr.hex())
         print("ciph", ciphertext.hex())
