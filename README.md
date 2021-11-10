@@ -6,7 +6,12 @@ Needs 802.15.4 CC2531 dongle with TIMAC firmware: https://www.ti.com/tool/TIMAC
 
 Display firmware: https://github.com/danielkucera/epaper-firmware
 
-Run:
+## Install
+```
+apt install python3-serial python3-crypto python3-pil
+```
+
+## Run
 ```
 python3 station.py
 ```
