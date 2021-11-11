@@ -85,7 +85,10 @@ logger = logging.getLogger(__name__)
 dsn = 0
 
 def print(*args):
-    logger.warning(args)
+    msg = ""
+    for arg in args:
+        msg += str(arg) + " "
+    logger.warning(msg)
 
 def decrypt(hdr, enc, tag, nonce):
     cipher = AES.new(masterkey, AES.MODE_CCM, nonce, mac_len=4)
@@ -155,7 +158,6 @@ def get_image_data(client):
     image_data = f.read()
     f.close()
 
-    print(len(image_data))
     return image_data
 
 def process_checkin(pkt, data):
@@ -194,7 +196,7 @@ def process_download(pkt, data):
 
     outpkt = bytearray([ PKT_CHUNK_RESP ]) + bytearray(struct.pack('<LBB', *ci)) + bytearray(fdata)
 
-    print("sending chunk", len(outpkt), outpkt)
+    print("sending chunk", len(outpkt), outpkt[:10],"...")
 
     send_data(pkt['src_add'], outpkt)
 
