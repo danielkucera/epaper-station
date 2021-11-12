@@ -6,6 +6,7 @@ import os
 import logging
 from PIL import Image
 import binascii
+import time
 
 masterkey = bytearray.fromhex("D306D9348E29E5E358BF2934812002C1")
 
@@ -114,8 +115,10 @@ def send_data(dst, data):
     hdr.extend(EXTENDED_ADDRESS)
     #print("hdr:", hdr.hex())
 
-    cntr = bytearray.fromhex("00000000")
-    nonce = bytearray.fromhex("00000000")
+    cntr = int(time.time())
+    cntrb = struct.pack('<L', cntr)
+
+    nonce = bytearray(cntrb)
     nonce.extend(EXTENDED_ADDRESS)
     nonce.append(0)
     #print("nonce:", nonce.hex())
@@ -124,7 +127,7 @@ def send_data(dst, data):
     cipher.update(hdr)
     ciphertext, tag = cipher.encrypt_and_digest(data)
 
-    out = ciphertext+tag+cntr
+    out = ciphertext+tag+cntrb
     timaccop.mac_data_req(dst, PANID, 12, dsn, out)
 
 def process_assoc(pkt, data):
