@@ -63,6 +63,7 @@ imgUpdateVer,
 imgUpdateSize,
 osUpdateVer,
 osUpdateSize,
+nextCheckinDelay,
 rfu
 """)
 
@@ -175,11 +176,12 @@ def process_checkin(pkt, data):
         imgUpdateSize = len(image_data),
         osUpdateVer = ci.swVer,
         osUpdateSize = 0,
-	    rfu=bytearray(8*[0])
+        nextCheckinDelay = 0,
+        rfu=bytearray(4*[0])
     )
     print(pi)
 
-    pi_pkt = bytearray([ PKT_CHECKOUT ]) + bytearray(struct.pack('<QLQL8s', *pi))
+    pi_pkt = bytearray([ PKT_CHECKOUT ]) + bytearray(struct.pack('<QLQLL4s', *pi))
 
     send_data(pkt['src_add'], pi_pkt)
 
