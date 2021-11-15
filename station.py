@@ -7,6 +7,7 @@ import logging
 from PIL import Image
 import binascii
 import time
+from io import BytesIO
 
 masterkey = bytearray.fromhex("D306D9348E29E5E358BF2934812002C1")
 
@@ -14,6 +15,7 @@ PORT = "/dev/ttyACM0"
 EXTENDED_ADDRESS = [ 0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35 ]
 PANID = [ 0x47, 0x44 ]
 CHANNEL = 11
+IMAGE_WORKDIR = "/tmp/"
 
 PKT_ASSOC_REQ			= (0xF0)
 PKT_ASSOC_RESP			= (0xF1)
@@ -148,18 +150,35 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
-def get_image_data(client):
+def prepare_image(client):
     filename = bytes(client).hex() + ".png"
     print("Reading image file:", filename)
 
-    file_conv = filename + ".bmp"
+    pf = open(filename,mode='rb')
+    imgData = pf.read()
+    imgVer = binascii.crc32(imgData)
+    pf.close()
 
-    im = Image.open(filename)
-    im_L = im.convert("1")
-    im_L.save(file_conv)
+    file_conv = IMAGE_WORKDIR + str(imgVer) + ".bmp"
 
-    f = open(file_conv,mode='rb')
-    image_data = f.read()
+    if not os.path.isfile(file_conv):
+        pngdata = BytesIO(imgData)
+
+        im = Image.open(pngdata)
+        im_L = im.convert("1")
+        im_L.save(file_conv)
+
+    imgLen = os.path.getsize(file_conv)
+
+    return (imgVer, imgLen)
+
+def get_image_data(imgVer, offset, length):
+    filename = IMAGE_WORKDIR + str(imgVer) + ".bmp"
+    print("Reading image file:", filename)
+
+    f = open(filename,mode='rb')
+    f.seek(offset)
+    image_data = f.read(length)
     f.close()
 
     return image_data
@@ -168,12 +187,16 @@ def process_checkin(pkt, data):
     ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
     print(ci)
 
-    image_data = get_image_data(pkt['src_add'])
-    imgVer = binascii.crc32(image_data)
+    try:
+        imgVer, imgLen = prepare_image(pkt['src_add'])
+    except Exception as e :
+        print("Unable to prepare image data for client", pkt['src_add'])
+        print(e)
+        return
 
     pi = PendingInfo(
-        imgUpdateVer = imgVer, #increment on image change
-        imgUpdateSize = len(image_data),
+        imgUpdateVer = imgVer,
+        imgUpdateSize = imgLen,
         osUpdateVer = ci.swVer,
         osUpdateSize = 0,
         nextCheckinDelay = 0,
@@ -196,12 +219,16 @@ def process_download(pkt, data):
     )
     print(ci)
 
-    image_data = get_image_data(pkt['src_add'])
-    fdata = image_data[cri.offset:cri.offset+cri.len]
+    try:
+        fdata = get_image_data(cri.versionRequested, cri.offset, cri.len)
+    except Exception as e :
+        print("Unable to get image data for version", cri.versionRequested)
+        print(e)
+        return
 
     outpkt = bytearray([ PKT_CHUNK_RESP ]) + bytearray(struct.pack('<LBB', *ci)) + bytearray(fdata)
 
-    print("sending chunk", len(outpkt), outpkt[:10],"...")
+    print("sending chunk", len(outpkt), outpkt[:10].hex() ,"...")
 
     send_data(pkt['src_add'], outpkt)
 
