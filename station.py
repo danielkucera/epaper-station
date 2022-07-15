@@ -255,6 +255,11 @@ def generate_pkt_header(pkt): #hacky- timaccop cannot provide header data
 
 def process_pkt(pkt):
     hdr = generate_pkt_header(pkt)
+    
+    if len(pkt['data']) < 10:
+        print("Received a too short paket")
+        print("data", pkt['data'].hex())
+        return
 
     nonce = bytearray(pkt['data'][-4:])
     nonce.extend(reversed(pkt['src_add']))
