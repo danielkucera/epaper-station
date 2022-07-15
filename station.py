@@ -154,9 +154,13 @@ def prepare_image(client):
     filename = bytes(client).hex() + ".png"
     print("Reading image file:", filename)
 
+    modification_time = os.path.getmtime(filename)
+    creation_time = os.path.getctime(filename)
+    
     pf = open(filename,mode='rb')
     imgData = pf.read()
-    imgVer = binascii.crc32(imgData)
+    imgVer = int(modification_time)<<32|int(creation_time) # This uses the mofidication time of the image to look for the newest one
+    #imgVer = binascii.crc32(imgData) # This uses the CRC of the image to look for a newer one but can fail as on "stock" custom firmware the highest number is used
     pf.close()
 
     file_conv = IMAGE_WORKDIR + str(imgVer) + ".bmp"
@@ -251,6 +255,11 @@ def generate_pkt_header(pkt): #hacky- timaccop cannot provide header data
 
 def process_pkt(pkt):
     hdr = generate_pkt_header(pkt)
+    
+    if len(pkt['data']) < 10:
+        print("Received a too short paket")
+        print("data", pkt['data'].hex())
+        return
 
     nonce = bytearray(pkt['data'][-4:])
     nonce.extend(reversed(pkt['src_add']))
