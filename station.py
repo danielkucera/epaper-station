@@ -24,6 +24,26 @@ PKT_CHECKOUT			= (0xF3)
 PKT_CHUNK_REQ			= (0xF4)
 PKT_CHUNK_RESP			= (0xF5)
 
+VERSION_SIGNIFICANT_MASK				= (0x0000ffffffffffff)
+
+HW_TYPE_42_INCH_SAMSUNG					= (1)
+HW_TYPE_42_INCH_SAMSUNG_ROM_VER_OFST	= (0xEFF8)
+HW_TYPE_74_INCH_DISPDATA				= (2)
+HW_TYPE_74_INCH_DISPDATA_FRAME_MODE		= (3)
+HW_TYPE_74_INCH_DISPDATA_ROM_VER_OFST	= (0x008b)
+HW_TYPE_ZBD_EPOP50						= (4)
+HW_TYPE_ZBD_EPOP50_ROM_VER_OFST			= (0x008b)
+HW_TYPE_ZBD_EPOP900						= (5)
+HW_TYPE_ZBD_EPOP900_ROM_VER_OFST		= (0x008b)
+HW_TYPE_29_INCH_DISPDATA				= (6)
+HW_TYPE_29_INCH_DISPDATA_FRAME_MODE		= (7)
+HW_TYPE_29_INCH_DISPDATA_ROM_VER_OFST	= (0x008b)
+HW_TYPE_29_INCH_ZBS_026					= (8)
+HW_TYPE_29_INCH_ZBS_026_FRAME_MODE		= (9)
+HW_TYPE_29_INCH_ZBS_025					= (10)
+HW_TYPE_29_INCH_ZBS_025_FRAME_MODE		= (11)
+HW_TYPE_29_INCH_ZBS_ROM_VER_OFST		= (0x008b)
+
 
 TagInfo = namedtuple('TagInfo', """
 protoVer,
@@ -152,11 +172,16 @@ def process_assoc(pkt, data):
 
 def prepare_image(client):
     filename = bytes(client).hex() + ".png"
+    
     print("Reading image file:", filename)
+
+    if not os.path.isfile(filename):
+        print("No Image file available")
+        return (0,0)
 
     modification_time = os.path.getmtime(filename)
     creation_time = os.path.getctime(filename)
-    
+
     pf = open(filename,mode='rb')
     imgData = pf.read()
     imgVer = int(modification_time)<<32|int(creation_time) # This uses the mofidication time of the image to look for the newest one
@@ -176,6 +201,43 @@ def prepare_image(client):
 
     return (imgVer, imgLen)
 
+def get_firmware_offset(hwType):
+    if hwType == HW_TYPE_42_INCH_SAMSUNG:
+        return HW_TYPE_42_INCH_SAMSUNG_ROM_VER_OFST
+    if hwType == HW_TYPE_74_INCH_DISPDATA:
+        return HW_TYPE_74_INCH_DISPDATA_ROM_VER_OFST   
+    if hwType == HW_TYPE_74_INCH_DISPDATA_FRAME_MODE:
+        return HW_TYPE_74_INCH_DISPDATA_ROM_VER_OFST
+    if hwType == HW_TYPE_29_INCH_DISPDATA:
+        return HW_TYPE_29_INCH_DISPDATA_ROM_VER_OFST
+    if hwType == HW_TYPE_29_INCH_DISPDATA_FRAME_MODE:
+        return HW_TYPE_29_INCH_DISPDATA_ROM_VER_OFST
+    if hwType == HW_TYPE_ZBD_EPOP50:
+        return HW_TYPE_ZBD_EPOP50_ROM_VER_OFST
+    if hwType == HW_TYPE_ZBD_EPOP900:
+        return HW_TYPE_ZBD_EPOP900_ROM_VER_OFST
+    if hwType == HW_TYPE_29_INCH_ZBS_026 or hwType == HW_TYPE_29_INCH_ZBS_026_FRAME_MODE or hwType == HW_TYPE_29_INCH_ZBS_025 or hwType == HW_TYPE_29_INCH_ZBS_025_FRAME_MODE:
+        return HW_TYPE_29_INCH_ZBS_ROM_VER_OFST
+
+def prepare_firmware(hwType):
+    filename = 'UPDT{0:0{1}X}.BIN'.format(hwType,4)
+    
+    print("Reading firmware file:", filename)
+
+    if not os.path.isfile(filename):
+        print("No Firmware file available")
+        return (0,0)
+
+    f = open(filename,mode='rb')
+    f.seek(get_firmware_offset(hwType))
+    firmwareVersionData = f.read(8)
+    f.close()
+
+    osVer = int.from_bytes(firmwareVersionData, "little") & VERSION_SIGNIFICANT_MASK | hwType << 48
+    osLen = os.path.getsize(filename)
+
+    return (osVer, osLen)
+
 def get_image_data(imgVer, offset, length):
     filename = IMAGE_WORKDIR + str(imgVer) + ".bmp"
     print("Reading image file:", filename)
@@ -187,22 +249,45 @@ def get_image_data(imgVer, offset, length):
 
     return image_data
 
+def get_fw_data(hwType, offset, length):
+    filename = 'UPDT{0:0{1}X}.BIN'.format(hwType,4)
+    print("Reading firmware file:", filename)
+
+    f = open(filename,mode='rb')
+    f.seek(offset)
+    fw_data = f.read(length)
+    f.close()
+
+    return fw_data
+
 def process_checkin(pkt, data):
     ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
+    
     print(ci)
+
+    imgVer = 0
+    imgLen = 0
 
     try:
         imgVer, imgLen = prepare_image(pkt['src_add'])
     except Exception as e :
         print("Unable to prepare image data for client", pkt['src_add'])
         print(e)
-        return
+
+    osVer = 0
+    osLen = 0
+
+    try:
+        osVer, osLen = prepare_firmware(ci.hwType)
+    except Exception as e :
+        print("Unable to prepare firmware data for client", pkt['src_add'])
+        print(e)
 
     pi = PendingInfo(
         imgUpdateVer = imgVer,
         imgUpdateSize = imgLen,
-        osUpdateVer = ci.swVer,
-        osUpdateSize = 0,
+        osUpdateVer = osVer,
+        osUpdateSize = osLen,
         nextCheckinDelay = 0,
         rfu=bytearray(4*[0])
     )
@@ -218,15 +303,18 @@ def process_download(pkt, data):
 
     ci = ChunkInfo(
         offset = cri.offset,
-        osUpdatePlz = 0,
+        osUpdatePlz = cri.osUpdatePlz,
         rfu = 0,
     )
     print(ci)
 
     try:
-        fdata = get_image_data(cri.versionRequested, cri.offset, cri.len)
+        if ci.osUpdatePlz:
+            fdata = get_fw_data(cri.versionRequested>>48, cri.offset, cri.len)
+        else:
+            fdata = get_image_data(cri.versionRequested, cri.offset, cri.len)
     except Exception as e :
-        print("Unable to get image data for version", cri.versionRequested)
+        print("Unable to get data for version", cri.versionRequested)
         print(e)
         return
 
