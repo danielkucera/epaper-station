@@ -171,16 +171,16 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
-def prepare_image(client):      
+def prepare_image(client):
     is_bmp = 0
-    filename = bytes(client).hex() + ".png" # also check for .png for backward compatibility
-    print("Reading image file:" + bytes(client).hex() + ".bmp/.png")
-    if os.path.isfile(bytes(client).hex() + ".bmp"):
-        filename = bytes(client).hex() + ".bmp"
-        is_bmp = 1
-        print("Using .bmp file")
-    elif os.path.isfile(filename):
+    filename = bytes(client).hex() + ".png"
+    print("Reading image file:" + bytes(client).hex() + ".bmp/.png")    
+    if os.path.isfile(filename):
         print("Using .png file")
+    elif os.path.isfile(bytes(client).hex() + ".bmp"):
+        is_bmp = 1
+        filename = bytes(client).hex() + ".bmp"
+        print("Using .bmp file")
     else:
         print("No Image file available")
         return (0,0)
@@ -192,16 +192,11 @@ def prepare_image(client):
     file_conv = IMAGE_WORKDIR + bytes(client).hex().upper() + "_" + str(imgVer) + ".bmp" # also use the MAC in case 1 images are created within 1 second
 
     if not os.path.isfile(file_conv):
-        if is_bmp == 1:
-            bmp2grays.convertImage(1, "1bppR", filename, file_conv)
+        if is_bmp == 0:
+            Image.open(bytes(client).hex() + ".png").convert("RGB").save(IMAGE_WORKDIR + "tempConvert.bmp")
+            bmp2grays.convertImage(1, "1bppR", IMAGE_WORKDIR + "tempConvert.bmp", file_conv)
         else:
-            pf = open(filename,mode='rb')
-            imgData = pf.read()
-            pf.close()
-            pngdata = BytesIO(imgData)
-            im = Image.open(pngdata)
-            im_L = im.convert("1")
-            im_L.save(file_conv)
+            bmp2grays.convertImage(1, "1bppR", bytes(client).hex() + ".bmp", file_conv)
 
     imgLen = os.path.getsize(file_conv)
 
