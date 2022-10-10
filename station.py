@@ -1,4 +1,5 @@
 import timaccop 
+import bmp2grays 
 from Cryptodome.Cipher import AES
 from collections import namedtuple
 import struct
@@ -161,7 +162,7 @@ def process_assoc(pkt, data):
 	    checkinDelay=900000, #check each 900sec 
 	    retryDelay=1000, #retry delay 1000ms
 	    failedCheckinsTillBlank=2,
-	    failedCheckinsTillDissoc=0,
+	    failedCheckinsTillDissoc=2,# Better enable this by default
 	    newKey=masterkey,
 	    rfu=bytearray(8*[0])
     )
@@ -170,32 +171,37 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
-def prepare_image(client):
-    filename = bytes(client).hex() + ".png"
-    
-    print("Reading image file:", filename)
-
-    if not os.path.isfile(filename):
+def prepare_image(client):      
+    is_bmp = 0
+    filename = bytes(client).hex() + ".png" # also check for .png for backward compatibility
+    print("Reading image file:" + bytes(client).hex() + ".bmp/.png")
+    if os.path.isfile(bytes(client).hex() + ".bmp"):
+        filename = bytes(client).hex() + ".bmp"
+        is_bmp = 1
+        print("Using .bmp file")
+    elif os.path.isfile(filename):
+        print("Using .png file")
+    else:
         print("No Image file available")
         return (0,0)
 
     modification_time = os.path.getmtime(filename)
     creation_time = os.path.getctime(filename)
-
-    pf = open(filename,mode='rb')
-    imgData = pf.read()
     imgVer = int(modification_time)<<32|int(creation_time) # This uses the mofidication time of the image to look for the newest one
-    #imgVer = binascii.crc32(imgData) # This uses the CRC of the image to look for a newer one but can fail as on "stock" custom firmware the highest number is used
-    pf.close()
 
-    file_conv = IMAGE_WORKDIR + str(imgVer) + ".bmp"
+    file_conv = IMAGE_WORKDIR + bytes(client).hex().upper() + "_" + str(imgVer) + ".bmp" # also use the MAC in case 1 images are created within 1 second
 
     if not os.path.isfile(file_conv):
-        pngdata = BytesIO(imgData)
-
-        im = Image.open(pngdata)
-        im_L = im.convert("1")
-        im_L.save(file_conv)
+        if is_bmp == 1:
+            bmp2grays.convertImage(1, "1bppR", filename, file_conv)
+        else:
+            pf = open(filename,mode='rb')
+            imgData = pf.read()
+            pf.close()
+            pngdata = BytesIO(imgData)
+            im = Image.open(pngdata)
+            im_L = im.convert("1")
+            im_L.save(file_conv)
 
     imgLen = os.path.getsize(file_conv)
 
@@ -239,7 +245,7 @@ def prepare_firmware(hwType):
     return (osVer, osLen)
 
 def get_image_data(imgVer, offset, length):
-    filename = IMAGE_WORKDIR + str(imgVer) + ".bmp"
+    filename = IMAGE_WORKDIR + imgVer + ".bmp"
     print("Reading image file:", filename)
 
     f = open(filename,mode='rb')
@@ -312,7 +318,7 @@ def process_download(pkt, data):
         if ci.osUpdatePlz:
             fdata = get_fw_data(cri.versionRequested>>48, cri.offset, cri.len)
         else:
-            fdata = get_image_data(cri.versionRequested, cri.offset, cri.len)
+            fdata = get_image_data(bytes(pkt['src_add']).hex().upper() + "_" + str(cri.versionRequested), cri.offset, cri.len)
     except Exception as e :
         print("Unable to get data for version", cri.versionRequested)
         print(e)
