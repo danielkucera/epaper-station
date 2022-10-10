@@ -19,7 +19,7 @@ python3 station.py
 ## Usage
 
 - to pair a display, it has to be really really close (touching the adapter with left edge)
-- when the display "checks in", it will check the presence of <DISPLAY_MAC>.png in current dir, convert it to bmp and send to display
+- when the display "checks in", it will check the presence of <DISPLAY_MAC>.bmp(24bit With RED) or <DISPLAY_MAC>.png(Only Black White) in current dir, convert it to bmp and send to display
   - if the image doesn't change, the display will stay as is and checks back again in defined interval (`checkinDelay`)
 
 ## Possible improvements
