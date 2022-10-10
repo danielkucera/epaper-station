@@ -171,7 +171,7 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
-def prepare_image(client):       
+def prepare_image(client):
     is_bmp = 0
     filename = bytes(client).hex() + ".png"
     print("Reading image file:" + bytes(client).hex() + ".bmp/.png")    
@@ -193,10 +193,10 @@ def prepare_image(client):
 
     if not os.path.isfile(file_conv):
         if is_bmp == 0:
-            Image.open(bytes(client).hex() + ".png").convert("RGB").save(bytes(client).hex() + ".bmp")
-        bmp2grays.convertImage(1, "1bppR", bytes(client).hex() + ".bmp", file_conv)
-        if is_bmp == 0:
-            os.remove(bytes(client).hex() + ".bmp")
+            Image.open(bytes(client).hex() + ".png").convert("RGB").save(IMAGE_WORKDIR + "tempConvert.bmp")
+            bmp2grays.convertImage(1, "1bppR", IMAGE_WORKDIR + "tempConvert.bmp", file_conv)
+        else:
+            bmp2grays.convertImage(1, "1bppR", bytes(client).hex() + ".bmp", file_conv)
 
     imgLen = os.path.getsize(file_conv)
 
