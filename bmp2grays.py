@@ -257,7 +257,7 @@ def convertImage(dither, method, inFile, outFile):
         putchar(0x00)
         putchar(0x00)
         putchar(0x00)
-        
+    
     while(numRows):
         numRows-=1
         pixelValsPackedSoFar = 0
@@ -288,7 +288,7 @@ def convertImage(dither, method, inFile, outFile):
                     bestIdx = col
             
             # pack pixels as needed
-            pixelValsPackedSoFar = pixelValsPackedSoFar * packedMultiplyVal + bestIdx
+            pixelValsPackedSoFar = int(pixelValsPackedSoFar * packedMultiplyVal) + bestIdx
             numPixelsPackedSoFar += 1
             if numPixelsPackedSoFar != pixelsPerPackedUnit:
                 continue
@@ -308,12 +308,11 @@ def convertImage(dither, method, inFile, outFile):
                 valSoFar &= (1 << bitsSoFar) - 1
                 bytesOut += 1
         
-        
 		#see if we have unfinished pixel packages to write
         if numPixelsPackedSoFar > 0:
             while(numPixelsPackedSoFar != pixelsPerPackedUnit):
                 numPixelsPackedSoFar += 1
-                pixelsPerPackedUnit = int(pixelValsPackedSoFar * packedMultiplyVal)
+                pixelValsPackedSoFar *= packedMultiplyVal;
             
             #it is easier to display when low val is firts pixel. currently last pixel is low - reverse this
             pixelValsPackedSoFar = repackPackedVals(pixelValsPackedSoFar, pixelsPerPackedUnit, packedMultiplyVal)
@@ -322,12 +321,17 @@ def convertImage(dither, method, inFile, outFile):
             pixelValsPackedSoFar = 0
             bitsSoFar += packedOutBpp
         
-        
+            if bitsSoFar >= 8:
+                bitsSoFar -= 8
+                putchar(valSoFar >> (bitsSoFar))
+                valSoFar &= (1 << bitsSoFar) - 1
+                bytesOut += 1
+                
         if bitsSoFar > 0:
-            valSoFar <<= (8 - bitsSoFar) # left-align it as is expected
+            valSoFar <<= 8 - bitsSoFar # left-align it as is expected
             putchar(valSoFar)
             bytesOut += 1
-        
+                    
         getBytes(rowBytesIn-bytesIn)
         putBytes(list(bytes(rowBytesOut-bytesOut)),rowBytesOut-bytesOut)
     
@@ -335,4 +339,4 @@ def convertImage(dither, method, inFile, outFile):
     print("done")
     return 0
 
-#convertImage(1, "1bppR", "a.bmp", "out.bin")
+#convertImage(0, "1bppR", "a.bmp", "out.bin")
