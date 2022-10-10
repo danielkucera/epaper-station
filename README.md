@@ -2,9 +2,15 @@
 
 Contains PC based controll software for epaper display protocol by @dmitrygr (http://dmitry.gr/index.php?r=05.Projects&proj=29.%20eInk%20Price%20Tags)
 
-Needs 802.15.4 CC2531 dongle with TIMAC firmware: https://www.ti.com/tool/TIMAC
+## Dongle firmware
+- 802.15.4 CC2531 dongle needs TIMAC firmware from: https://www.ti.com/tool/TIMAC
+- after install, you should see following files:
 
-Display firmware: https://github.com/danielkucera/epaper-firmware
+![](https://user-images.githubusercontent.com/1734256/184469490-7287bd56-6ff9-4716-8b1d-2c8783fb2065.jpg)
+- you can use following methods to flash the dongle: https://www.zigbee2mqtt.io/guide/adapters/flashing/alternative_flashing_methods.html
+
+## Display firmware
+- https://github.com/danielkucera/epaper-firmware
 
 ## Install
 ```
