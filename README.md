@@ -22,6 +22,12 @@ apt install python3-serial python3-pycryptodome python3-pil
 python3 station.py
 ```
 
+## Docker
+```
+docker build -t epaper-station:latest .
+docker run --device=/dev/<tty>:/dev/<tty> -e EPS_PORT=/dev/<tty> epaper-station
+```
+
 ## Usage
 
 - to pair a display, it has to be really really close (touching the adapter with left edge)

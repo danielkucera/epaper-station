@@ -6,17 +6,16 @@ import struct
 import os
 import logging
 from PIL import Image
-import binascii
 import time
-from io import BytesIO
 
 masterkey = bytearray.fromhex("D306D9348E29E5E358BF2934812002C1")
 
-PORT = "/dev/ttyACM0"
-EXTENDED_ADDRESS = [ 0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35 ]
-PANID = [ 0x47, 0x44 ]
-CHANNEL = 11
-IMAGE_WORKDIR = "/tmp/"
+PORT = os.environ.get("EPS_PORT", default="/dev/ttyACM0")
+EXTENDED_ADDRESS = [ int(addr.strip(), 16) for addr in os.environ.get("EPS_EXTENDED_ADDRESS", default="0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35").split(",") ]
+PANID = [ int(panid.strip(), 16) for panid in os.environ.get("EPS_PANID", default="0x47, 0x44").split(",") ]
+CHANNEL = int(os.environ.get("EPS_CHANNEL", default="11"))
+IMAGE_DIR = os.environ.get("EPS_IMAGE_DIR", default="./")
+IMAGE_WORKDIR = os.environ.get("EPS_IMAGE_WORKDIR", default="/tmp/")
 
 PKT_ASSOC_REQ			= (0xF0)
 PKT_ASSOC_RESP			= (0xF1)
@@ -178,13 +177,14 @@ def process_assoc(pkt, data):
 
 def prepare_image(client):
     is_bmp = False
-    filename = bytes(client).hex() + ".png"
-    print("Reading image file:" + bytes(client).hex() + ".bmp/.png")    
+    base_name = os.path.join(IMAGE_DIR, bytes(client).hex())
+    filename = base_name + ".png"
+    print("Reading image file:" + base_name + ".bmp/.png")        
     if os.path.isfile(filename):
         print("Using .png file")
-    elif os.path.isfile(bytes(client).hex() + ".bmp"):
+    elif os.path.isfile(base_name + ".bmp"):
         is_bmp = True
-        filename = bytes(client).hex() + ".bmp"
+        filename = base_name + ".bmp"
         print("Using .bmp file")
     else:
         print("No Image file available")
@@ -194,7 +194,7 @@ def prepare_image(client):
     creation_time = os.path.getctime(filename)
     imgVer = int(modification_time)<<32|int(creation_time) # This uses the mofidication time of the image to look for the newest one
 
-    file_conv = IMAGE_WORKDIR + bytes(client).hex().upper() + "_" + str(imgVer) + ".bmp" # also use the MAC in case 1 images are created within 1 second
+    file_conv = os.path.join(IMAGE_WORKDIR, bytes(client).hex().upper() + "_" + str(imgVer) + ".bmp") # also use the MAC in case 1 images are created within 1 second
 
     if not os.path.isfile(file_conv):
         if is_bmp:
@@ -245,7 +245,7 @@ def prepare_firmware(hwType):
     return (osVer, osLen)
 
 def get_image_data(imgVer, offset, length):
-    filename = IMAGE_WORKDIR + imgVer + ".bmp"
+    filename = os.path.join(IMAGE_WORKDIR, imgVer + ".bmp")
     print("Reading image file:", filename)
 
     f = open(filename,mode='rb')
