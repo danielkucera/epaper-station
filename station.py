@@ -43,7 +43,12 @@ HW_TYPE_29_INCH_ZBS_026					= (8)
 HW_TYPE_29_INCH_ZBS_026_FRAME_MODE		= (9)
 HW_TYPE_29_INCH_ZBS_025					= (10)
 HW_TYPE_29_INCH_ZBS_025_FRAME_MODE		= (11)
+HW_TYPE_154_INCH_ZBS_033				= (18)
+HW_TYPE_154_INCH_ZBS_033_FRAME_MODE		= (19)
+HW_TYPE_42_INCH_ZBS_026					= (28)
+HW_TYPE_42_INCH_ZBS_026_FRAME_MODE		= (29)
 HW_TYPE_29_INCH_ZBS_ROM_VER_OFST		= (0x008b)
+
 
 
 TagInfo = namedtuple('TagInfo', """
@@ -172,13 +177,13 @@ def process_assoc(pkt, data):
     send_data(pkt['src_add'], ai_pkt)
 
 def prepare_image(client):
-    is_bmp = 0
+    is_bmp = False
     filename = bytes(client).hex() + ".png"
     print("Reading image file:" + bytes(client).hex() + ".bmp/.png")    
     if os.path.isfile(filename):
         print("Using .png file")
     elif os.path.isfile(bytes(client).hex() + ".bmp"):
-        is_bmp = 1
+        is_bmp = True
         filename = bytes(client).hex() + ".bmp"
         print("Using .bmp file")
     else:
@@ -192,11 +197,11 @@ def prepare_image(client):
     file_conv = IMAGE_WORKDIR + bytes(client).hex().upper() + "_" + str(imgVer) + ".bmp" # also use the MAC in case 1 images are created within 1 second
 
     if not os.path.isfile(file_conv):
-        if is_bmp == 0:
+        if is_bmp:
+            bmp2grays.convertImage(1, "1bppR", bytes(client).hex() + ".bmp", file_conv)
+        else:
             Image.open(bytes(client).hex() + ".png").convert("RGB").save(IMAGE_WORKDIR + "tempConvert.bmp")
             bmp2grays.convertImage(1, "1bppR", IMAGE_WORKDIR + "tempConvert.bmp", file_conv)
-        else:
-            bmp2grays.convertImage(1, "1bppR", bytes(client).hex() + ".bmp", file_conv)
 
     imgLen = os.path.getsize(file_conv)
 
@@ -217,7 +222,7 @@ def get_firmware_offset(hwType):
         return HW_TYPE_ZBD_EPOP50_ROM_VER_OFST
     if hwType == HW_TYPE_ZBD_EPOP900:
         return HW_TYPE_ZBD_EPOP900_ROM_VER_OFST
-    if hwType == HW_TYPE_29_INCH_ZBS_026 or hwType == HW_TYPE_29_INCH_ZBS_026_FRAME_MODE or hwType == HW_TYPE_29_INCH_ZBS_025 or hwType == HW_TYPE_29_INCH_ZBS_025_FRAME_MODE:
+    if hwType == HW_TYPE_29_INCH_ZBS_026 or hwType == HW_TYPE_29_INCH_ZBS_026_FRAME_MODE or hwType == HW_TYPE_29_INCH_ZBS_025 or hwType == HW_TYPE_29_INCH_ZBS_025_FRAME_MODE or hwType == HW_TYPE_154_INCH_ZBS_033 or hwType == HW_TYPE_154_INCH_ZBS_033_FRAME_MODE or hwType == HW_TYPE_42_INCH_ZBS_026 or hwType == HW_TYPE_42_INCH_ZBS_026_FRAME_MODE:
         return HW_TYPE_29_INCH_ZBS_ROM_VER_OFST
 
 def prepare_firmware(hwType):
