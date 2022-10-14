@@ -177,13 +177,13 @@ def process_assoc(pkt, data):
     send_data(pkt['src_add'], ai_pkt)
 
 def prepare_image(client):
-    is_bmp = false
+    is_bmp = False
     filename = bytes(client).hex() + ".png"
     print("Reading image file:" + bytes(client).hex() + ".bmp/.png")    
     if os.path.isfile(filename):
         print("Using .png file")
     elif os.path.isfile(bytes(client).hex() + ".bmp"):
-        is_bmp = true
+        is_bmp = True
         filename = bytes(client).hex() + ".bmp"
         print("Using .bmp file")
     else:
