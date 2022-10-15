@@ -203,10 +203,10 @@ def prepare_image(client):
 
     if not os.path.isfile(file_conv):
         if is_bmp:
-            bmp2grays.convertImage(1, "1bppR", bytes(client).hex() + ".bmp", file_conv)
+            bmp2grays.convertImage(1, "1bppR", filename, file_conv)
         else:
-            Image.open(bytes(client).hex() + ".png").convert("RGB").save(IMAGE_WORKDIR + "tempConvert.bmp")
-            bmp2grays.convertImage(1, "1bppR", IMAGE_WORKDIR + "tempConvert.bmp", file_conv)
+            Image.open(filename).convert("RGB").save(os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"))
+            bmp2grays.convertImage(1, "1bppR", os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"), file_conv)
 
     imgLen = os.path.getsize(file_conv)
 
