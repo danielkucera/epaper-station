@@ -17,6 +17,11 @@ CHANNEL = int(os.environ.get("EPS_CHANNEL", default="11"))
 IMAGE_DIR = os.environ.get("EPS_IMAGE_DIR", default="./")
 IMAGE_WORKDIR = os.environ.get("EPS_IMAGE_WORKDIR", default="/tmp/")
 
+CHECKIN_DELAY = int(os.environ.get("EPS_CHECKIN_DELAY", default="900000")) # 900s
+RETRY_DELAY = int(os.environ.get("EPS_RETRY_DELAY", default="1000")) # 1s
+FAILED_CHECKINS_TILL_BLANK = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_BLANK", default="2"))
+FAILED_CHECKINS_TILL_DISSOC = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_DISSOC", default="2"))
+
 PKT_ASSOC_REQ			= (0xF0)
 PKT_ASSOC_RESP			= (0xF1)
 PKT_CHECKIN				= (0xF2)
@@ -163,10 +168,10 @@ def process_assoc(pkt, data):
     print(ti)
 
     ai = AssocInfo(
-	    checkinDelay=900000, #check each 900sec 
-	    retryDelay=1000, #retry delay 1000ms
-	    failedCheckinsTillBlank=2,
-	    failedCheckinsTillDissoc=2,# Better enable this by default
+	    checkinDelay=CHECKIN_DELAY,
+	    retryDelay=RETRY_DELAY,
+	    failedCheckinsTillBlank=FAILED_CHECKINS_TILL_BLANK,
+	    failedCheckinsTillDissoc=FAILED_CHECKINS_TILL_DISSOC,
 	    newKey=masterkey,
 	    rfu=bytearray(8*[0])
     )
