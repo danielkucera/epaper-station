@@ -186,6 +186,12 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
+def get_tmp_files(client):
+    tmp_files = os.listdir(IMAGE_WORKDIR)
+    tmp_files = [x for x in tmp_files if x.startswith(bytes(client).hex().upper())]
+    tmp_files = [os.path.join(IMAGE_WORKDIR, x) for x in tmp_files]
+    return tmp_files
+
 def prepare_image(client, compressionSupported):
     is_bmp = False
     base_name = os.path.join(IMAGE_DIR, bytes(client).hex())
@@ -207,13 +213,18 @@ def prepare_image(client, compressionSupported):
 
     file_conv = os.path.join(IMAGE_WORKDIR, bytes(client).hex().upper() + "_" + str(imgVer) + ".bmp") # also use the MAC in case 1 images are created within 1 second
 
+    tmp_files = get_tmp_files(client)
+    tmp_files = [x for x in tmp_files if x != file_conv]
+
     if not os.path.isfile(file_conv):
         if is_bmp:
             bmp2grays.convertImage(1, "1bppR", filename, file_conv)
         else:
-            Image.open(filename).convert("RGB").save(os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"))
-            bmp2grays.convertImage(1, "1bppR", os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"), file_conv)
-            
+            f = os.path.join(IMAGE_WORKDIR, "tempConvert_{}.bmp".format(bytes(client).hex().upper()))
+            Image.open(filename).convert("RGB").save(f)
+            bmp2grays.convertImage(1, "1bppR", f, file_conv)
+            os.unlink(f)
+
         if compressionSupported == 1:
             file = open(file_conv,"rb")
             data = file.read()
@@ -223,6 +234,10 @@ def prepare_image(client, compressionSupported):
             file.write(compressed_data)
             file.close()
             print("Size before compression: " + str(len(data)) + " compressed: " + str(len(compressed_data)))
+
+    for f in tmp_files:
+        print('cleanup: {}'.format(f))
+        os.unlink(f)
 
     imgLen = os.path.getsize(file_conv)
 
