@@ -250,8 +250,8 @@ def get_firmware_offset(hwType):
         return HW_TYPE_29_INCH_ZBS_ROM_VER_OFST
 
 def prepare_firmware(hwType):
-    filename = 'UPDT{0:0{1}X}.BIN'.format(hwType,4)
-    
+    filename = os.path.join(IMAGE_DIR, 'UPDT{0:0{1}X}.BIN'.format(hwType,4))
+
     print("Reading firmware file:", filename)
 
     if not os.path.isfile(filename):
@@ -280,7 +280,7 @@ def get_image_data(imgVer, offset, length):
     return image_data
 
 def get_fw_data(hwType, offset, length):
-    filename = 'UPDT{0:0{1}X}.BIN'.format(hwType,4)
+    filename = os.path.join(IMAGE_DIR, 'UPDT{0:0{1}X}.BIN'.format(hwType,4))
     print("Reading firmware file:", filename)
 
     f = open(filename,mode='rb')
@@ -292,7 +292,7 @@ def get_fw_data(hwType, offset, length):
 
 def process_checkin(pkt, data):
     ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
-    
+
     print(ci)
 
     imgVer = 0
