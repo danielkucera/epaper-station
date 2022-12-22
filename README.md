@@ -38,3 +38,16 @@ docker run --device=/dev/<tty>:/dev/<tty> -e EPS_PORT=/dev/<tty> epaper-station
 
 - replace TIMACCoP with low level radio driver https://github.com/srhg/zag-bridge-firmware
 - user python library to decode received frames e.g. https://github.com/andrewdodd/pyCCSniffer/blob/master/ieee15dot4.py
+
+## License
+
+Copyright (c) 2022 Daniel Kucera
+
+THIS MATERIAL IS PROVIDED AS IS, WITH ABSOLUTELY NO WARRANTY EXPRESSED
+OR IMPLIED.  ANY USE IS AT YOUR OWN RISK.
+
+Permission is hereby granted to use or copy this program
+for any purpose,  provided the above notices are retained on all copies.
+Permission to modify the code and to distribute modified code is granted,
+provided the above notices are retained, and a notice that the code was
+modified is included with the above copyright notice.
