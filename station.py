@@ -53,6 +53,10 @@ HW_TYPE_42_INCH_ZBS_026					= (28)
 HW_TYPE_42_INCH_ZBS_026_FRAME_MODE		= (29)
 HW_TYPE_29_INCH_ZBS_ROM_VER_OFST		= (0x008b)
 
+HW_TYPE_74_INCH_BWR					= (40)
+HW_TYPE_74_INCH_BWR_ROM_VER_OFST	= (0x0160)
+HW_TYPE_58_INCH_BWR					= (41)
+HW_TYPE_58_INCH_BWR_ROM_VER_OFST	= (0x0160)
 
 
 TagInfo = namedtuple('TagInfo', """
@@ -213,6 +217,10 @@ def prepare_image(client):
     return (imgVer, imgLen)
 
 def get_firmware_offset(hwType):
+    if hwType == HW_TYPE_74_INCH_BWR:
+        return HW_TYPE_74_INCH_BWR_ROM_VER_OFST
+    if hwType == HW_TYPE_58_INCH_BWR:
+        return HW_TYPE_58_INCH_BWR_ROM_VER_OFST
     if hwType == HW_TYPE_42_INCH_SAMSUNG:
         return HW_TYPE_42_INCH_SAMSUNG_ROM_VER_OFST
     if hwType == HW_TYPE_74_INCH_DISPDATA:
