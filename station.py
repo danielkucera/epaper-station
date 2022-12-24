@@ -7,6 +7,7 @@ import os
 import logging
 from PIL import Image
 import time
+import gzip
 
 masterkey = bytearray.fromhex("D306D9348E29E5E358BF2934812002C1")
 
@@ -184,7 +185,7 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
-def prepare_image(client):
+def prepare_image(client, compressionSupported):
     is_bmp = False
     base_name = os.path.join(IMAGE_DIR, bytes(client).hex())
     filename = base_name + ".png"
@@ -211,6 +212,16 @@ def prepare_image(client):
         else:
             Image.open(filename).convert("RGB").save(os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"))
             bmp2grays.convertImage(1, "1bppR", os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"), file_conv)
+            
+        if compressionSupported == 1:
+            file = open(file_conv,"rb")
+            data = file.read()
+            file.close()
+            compressed_data = gzip.compress(data)
+            file = open(file_conv,"wb")
+            file.write(compressed_data)
+            file.close()
+            print("Size before compression: " + str(len(data)) + " compressed: " + str(len(compressed_data)))
 
     imgLen = os.path.getsize(file_conv)
 
@@ -288,7 +299,7 @@ def process_checkin(pkt, data):
     imgLen = 0
 
     try:
-        imgVer, imgLen = prepare_image(pkt['src_add'])
+        imgVer, imgLen = prepare_image(pkt['src_add'],ci.rfu[0])
     except Exception as e :
         print("Unable to prepare image data for client", pkt['src_add'])
         print(e)
