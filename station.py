@@ -127,6 +127,7 @@ logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger(__name__)
 
 dsn = 0
+checkin_devices = {}
 
 def print(*args):
     msg = ""
@@ -310,6 +311,13 @@ def get_fw_data(hwType, offset, length):
 
     return fw_data
 
+def cleanup_checkin_devices_context():
+    bmp_files = [x for x in os.scandir(IMAGE_DIR) if x.is_file() and x.name.endswith('.bmp')]
+    # clear all contexts that have no image file on disk
+    remaining = list(checkin_devices.keys() - [x.name.split('.')[0] for x in bmp_files])
+    for n in remaining:
+        del checkin_devices[n]
+
 def process_checkin(pkt, data):
     ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
 
@@ -326,6 +334,8 @@ def process_checkin(pkt, data):
 
     osVer = 0
     osLen = 0
+    checkin_devices[bytes(pkt['src_add']).hex()] = ci.rfu[0]
+    cleanup_checkin_devices_context()
 
     try:
         osVer, osLen = prepare_firmware(ci.hwType)
@@ -432,8 +442,11 @@ def process_pkt(pkt):
         print("Unknown request", typ)
 
 def prepare_image_onchange(filepath):
-    time.sleep(0.2)
-    return prepare_image([ x for x in bytearray.fromhex(os.path.basename(filepath).split('.')[0])])
+    dev = [ x for x in bytearray.fromhex(os.path.basename(filepath).split('.')[0])]
+    if bytes(dev).hex() in checkin_devices:
+        return prepare_image(dev, checkin_devices[bytes(dev).hex()])
+    else:
+        return (0,0)
 
 bmp_data = {}
 
