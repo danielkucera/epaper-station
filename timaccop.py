@@ -236,7 +236,7 @@ def init(port, pan_id, channel, ext_add, pk):
     pkt_callback = pk
 
     global ser
-    ser = serial.Serial(port, timeout=1)
+    ser = serial.Serial(port, 115200, timeout=1)
     ser.flushInput()
 
     ext_add.reverse()
