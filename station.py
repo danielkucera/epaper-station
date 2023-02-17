@@ -1,5 +1,5 @@
-import timaccop 
-import bmp2grays 
+import timaccop
+import bmp2grays
 from Cryptodome.Cipher import AES
 from collections import namedtuple
 import struct
@@ -8,6 +8,7 @@ import logging
 from PIL import Image
 import time
 import gzip
+import threading, concurrent.futures, traceback
 
 masterkey = bytearray.fromhex("D306D9348E29E5E358BF2934812002C1")
 
@@ -126,6 +127,7 @@ logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger(__name__)
 
 dsn = 0
+checkin_devices = {}
 
 def print(*args):
     msg = ""
@@ -189,11 +191,17 @@ def process_assoc(pkt, data):
 
     send_data(pkt['src_add'], ai_pkt)
 
+def get_tmp_files(client):
+    tmp_files = os.listdir(IMAGE_WORKDIR)
+    tmp_files = [x for x in tmp_files if x.startswith(bytes(client).hex().upper())]
+    tmp_files = [os.path.join(IMAGE_WORKDIR, x) for x in tmp_files]
+    return tmp_files
+
 def prepare_image(client, compressionSupported):
     is_bmp = False
     base_name = os.path.join(IMAGE_DIR, bytes(client).hex())
     filename = base_name + ".png"
-    print("Reading image file:" + base_name + ".bmp/.png")        
+    print("Reading image file:" + base_name + ".bmp/.png")
     if os.path.isfile(filename):
         print("Using .png file")
     elif os.path.isfile(base_name + ".bmp"):
@@ -210,13 +218,18 @@ def prepare_image(client, compressionSupported):
 
     file_conv = os.path.join(IMAGE_WORKDIR, bytes(client).hex().upper() + "_" + str(imgVer) + ".bmp") # also use the MAC in case 1 images are created within 1 second
 
+    tmp_files = get_tmp_files(client)
+    tmp_files = [x for x in tmp_files if x != file_conv]
+
     if not os.path.isfile(file_conv):
         if is_bmp:
             bmp2grays.convertImage(1, "1bppR", filename, file_conv)
         else:
-            Image.open(filename).convert("RGB").save(os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"))
-            bmp2grays.convertImage(1, "1bppR", os.path.join(IMAGE_WORKDIR, "tempConvert.bmp"), file_conv)
-            
+            f = os.path.join(IMAGE_WORKDIR, "tempConvert_{}.bmp".format(bytes(client).hex().upper()))
+            Image.open(filename).convert("RGB").save(f)
+            bmp2grays.convertImage(1, "1bppR", f, file_conv)
+            os.unlink(f)
+
         if compressionSupported == 1:
             file = open(file_conv,"rb")
             data = file.read()
@@ -226,6 +239,10 @@ def prepare_image(client, compressionSupported):
             file.write(compressed_data)
             file.close()
             print("Size before compression: " + str(len(data)) + " compressed: " + str(len(compressed_data)))
+
+    for f in tmp_files:
+        print('cleanup: {}'.format(f))
+        os.unlink(f)
 
     imgLen = os.path.getsize(file_conv)
 
@@ -239,7 +256,7 @@ def get_firmware_offset(hwType):
     if hwType == HW_TYPE_42_INCH_SAMSUNG:
         return HW_TYPE_42_INCH_SAMSUNG_ROM_VER_OFST
     if hwType == HW_TYPE_74_INCH_DISPDATA:
-        return HW_TYPE_74_INCH_DISPDATA_ROM_VER_OFST   
+        return HW_TYPE_74_INCH_DISPDATA_ROM_VER_OFST
     if hwType == HW_TYPE_74_INCH_DISPDATA_FRAME_MODE:
         return HW_TYPE_74_INCH_DISPDATA_ROM_VER_OFST
     if hwType == HW_TYPE_29_INCH_DISPDATA:
@@ -254,8 +271,8 @@ def get_firmware_offset(hwType):
         return HW_TYPE_29_INCH_ZBS_ROM_VER_OFST
 
 def prepare_firmware(hwType):
-    filename = 'UPDT{0:0{1}X}.BIN'.format(hwType,4)
-    
+    filename = os.path.join(IMAGE_DIR, 'UPDT{0:0{1}X}.BIN'.format(hwType,4))
+
     print("Reading firmware file:", filename)
 
     if not os.path.isfile(filename):
@@ -284,7 +301,7 @@ def get_image_data(imgVer, offset, length):
     return image_data
 
 def get_fw_data(hwType, offset, length):
-    filename = 'UPDT{0:0{1}X}.BIN'.format(hwType,4)
+    filename = os.path.join(IMAGE_DIR, 'UPDT{0:0{1}X}.BIN'.format(hwType,4))
     print("Reading firmware file:", filename)
 
     f = open(filename,mode='rb')
@@ -294,9 +311,16 @@ def get_fw_data(hwType, offset, length):
 
     return fw_data
 
+def cleanup_checkin_devices_context():
+    bmp_files = [x for x in os.scandir(IMAGE_DIR) if x.is_file() and x.name.endswith('.bmp')]
+    # clear all contexts that have no image file on disk
+    remaining = list(checkin_devices.keys() - [x.name.split('.')[0] for x in bmp_files])
+    for n in remaining:
+        del checkin_devices[n]
+
 def process_checkin(pkt, data):
     ci = CheckinInfo._make(struct.unpack('<QHHBBB6s',data))
-    
+
     print(ci)
 
     imgVer = 0
@@ -310,6 +334,8 @@ def process_checkin(pkt, data):
 
     osVer = 0
     osLen = 0
+    checkin_devices[bytes(pkt['src_add']).hex()] = ci.rfu[0]
+    cleanup_checkin_devices_context()
 
     try:
         osVer, osLen = prepare_firmware(ci.hwType)
@@ -377,7 +403,7 @@ def generate_pkt_header(pkt): #hacky- timaccop cannot provide header data
 
 def process_pkt(pkt):
     hdr = generate_pkt_header(pkt)
-    
+
     if len(pkt['data']) < 10:
         print("Received a too short paket")
         print("data", pkt['data'].hex())
@@ -415,8 +441,63 @@ def process_pkt(pkt):
     else:
         print("Unknown request", typ)
 
+def prepare_image_onchange(filepath):
+    dev = [ x for x in bytearray.fromhex(os.path.basename(filepath).split('.')[0])]
+    if bytes(dev).hex() in checkin_devices:
+        return prepare_image(dev, checkin_devices[bytes(dev).hex()])
+    else:
+        return (0,0)
+
+bmp_data = {}
+
+def bmp_poller(evt):
+    while not evt.wait(1):
+        bmp_files = [x for x in os.scandir(IMAGE_DIR) if x.is_file() and x.name.endswith('.bmp')]
+        bmp_files_found = []
+        for bmp_file in bmp_files:
+            if bmp_file.name in bmp_data:
+                # file is in data and directory
+                s = bmp_file.stat()
+                if s.st_mtime != bmp_data[bmp_file.name].st_mtime:
+                    print(f'changed file {bmp_file.name}')
+                    bmp_data[bmp_file.name] = s
+                    bmp_files_found.append(bmp_file.name)
+            else:
+                # file is not in data but in directory --> new one
+                bmp_data[bmp_file.name] = bmp_file.stat()
+                print(f'new file {bmp_file.name}')
+                bmp_files_found.append(bmp_file.name)
+        for old_file in bmp_data.keys() - [x.name for x in bmp_files]:
+            # garbage collection for files no more on disc but in bmp_data
+            print(f'drop file {old_file}')
+            del bmp_data[old_file]
+        if len(bmp_files_found) > 0:
+            # limit workers to one as bmp2grays uses global variables
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                bmp_files_udpated = {executor.submit(prepare_image_onchange, os.path.join(IMAGE_DIR, bmp_name)): bmp_name for bmp_name in bmp_files_found}
+                for bmp_file_updated in concurrent.futures.as_completed(bmp_files_udpated):
+                    bfup = bmp_files_udpated[bmp_file_updated]
+                    try:
+                        data = bmp_file_updated.result()
+                    except Exception as exc:
+                        print(f'{bfup} raised an exception:')
+                        traceback.print_exception(exc)
+                    else:
+                        print(f'{bfup} processed {data}')
+    print('bmp_poller exit now')
+
 timaccop.init(PORT, PANID, CHANNEL, EXTENDED_ADDRESS, process_pkt)
+
+bmp_evt = threading.Event()
+bmp_thr = threading.Thread(target=bmp_poller, args=(bmp_evt,))
+bmp_thr.start()
+
 print("Station started")
 
-timaccop.run()
+try:
+    timaccop.run()
+except KeyboardInterrupt:
+    bmp_evt.set()
+    bmp_thr.join()
 
+print('Station stopped')
