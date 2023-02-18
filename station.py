@@ -10,6 +10,7 @@ import time
 import gzip
 import threading, concurrent.futures, traceback
 import json
+import subprocess
 
 # config settings
 CONFIG_PATH = os.environ.get("CONFIG_PATH", default="./config.json")
@@ -49,6 +50,10 @@ RETRY_DELAY = int(os.environ.get("EPS_RETRY_DELAY", default=config["station"]["r
 FAILED_CHECKINS_TILL_BLANK = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_BLANK", default=config["station"]["failedCheckinsTillBlank"]))
 FAILED_CHECKINS_TILL_DISSOC = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_DISSOC", default=config["station"]["failedCheckinsTillDisassociate"]))
 
+# image generation config
+IMGGEN_COMMAND = os.environ.get("IMGGEN_COMMAND", default=config["station"]["imggenCommand"]).split(" ")
+IMGGEN_INTERVAL = int(os.environ.get("IMGGEN_INTERVAL", default=config["station"]["imggenIntervalMs"]))/1000
+IMGGEN_USE = len(IMGGEN_COMMAND) > 1 and IMGGEN_INTERVAL != 0
 # check for and create missing directories if create options are set
 if not os.path.exists(IMAGE_DIR):
     if CREATE_IMGDIR:
@@ -180,6 +185,8 @@ def print(*args):
 def exit(exitCode=0):
     bmp_evt.set()
     bmp_thr.join()
+    if IMGGEN_USE:
+        imggen_thr.cancel()
     print('Station stopped')
     os._exit(exitCode)
 
@@ -293,7 +300,6 @@ def prepare_image(client, compressionSupported):
         os.unlink(f)
 
     imgLen = os.path.getsize(file_conv)
-
     return (imgVer, imgLen)
 
 def get_firmware_offset(hwType):
@@ -534,6 +540,16 @@ def bmp_poller(evt):
                         print(f'{bfup} processed {data}')
     print('bmp_poller exit now')
 
+# function that gets called on image generation cycle
+def generateImages():
+    print("running image generator")
+    subprocess.run(IMGGEN_COMMAND)
+
+class RepeatTimer(threading.Timer):  
+    def run(self):  
+        while not self.finished.wait(self.interval):  
+            self.function(*self.args,**self.kwargs)  
+
 try:
     timaccop.init(PORT, PANID, CHANNEL, EXTENDED_ADDRESS, process_pkt)
 except Exception as e: # graceful exit on missing or misconfigured coordinator stick
@@ -542,6 +558,14 @@ except Exception as e: # graceful exit on missing or misconfigured coordinator s
 
 bmp_evt = threading.Event()
 bmp_thr = threading.Thread(target=bmp_poller, args=(bmp_evt,))
+# image generation thread init
+imggen_thr = None
+if IMGGEN_USE:
+    print(f"external image generator ({IMGGEN_COMMAND}) will be called every {IMGGEN_INTERVAL/1000} seconds")
+    imggen_thr = RepeatTimer(IMGGEN_INTERVAL, generateImages)
+    generateImages()
+    imggen_thr.start()
+
 bmp_thr.start()
 
 print("Station started")

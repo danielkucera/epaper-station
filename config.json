@@ -12,6 +12,8 @@
         "createWorkdirIfNotExists": false,
         "createImagedirIfNotExists": false,
         "imagedir": "./",
-        "workdir": "/tmp/"
+        "workdir": "/tmp/",
+        "imggenCommand": "echo set imggenIntervalMs > 0 to run this command periodically",
+        "imggenIntervalMs": 0
     }
 }
