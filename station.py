@@ -177,6 +177,12 @@ def print(*args):
         msg += str(arg) + " "
     logger.warning(msg)
 
+def exit(exitCode=0):
+    bmp_evt.set()
+    bmp_thr.join()
+    print('Station stopped')
+    os._exit(exitCode)
+
 def decrypt(hdr, enc, tag, nonce):
     cipher = AES.new(masterkey, AES.MODE_CCM, nonce, mac_len=4)
     cipher.update(hdr)
@@ -528,7 +534,11 @@ def bmp_poller(evt):
                         print(f'{bfup} processed {data}')
     print('bmp_poller exit now')
 
-timaccop.init(PORT, PANID, CHANNEL, EXTENDED_ADDRESS, process_pkt)
+try:
+    timaccop.init(PORT, PANID, CHANNEL, EXTENDED_ADDRESS, process_pkt)
+except Exception as e: # graceful exit on missing or misconfigured coordinator stick
+    print(f"Coordinator init failed. (Wrong interface configured ({PORT}), coordinator not properly connected or missing sialout privileges?)")
+    os._exit(29)
 
 bmp_evt = threading.Event()
 bmp_thr = threading.Thread(target=bmp_poller, args=(bmp_evt,))
@@ -539,7 +549,8 @@ print("Station started")
 try:
     timaccop.run()
 except KeyboardInterrupt:
-    bmp_evt.set()
-    bmp_thr.join()
-
-print('Station stopped')
+    print("stopped by SIGINT")
+    exit(0)
+except Exception as e:
+    print("Zigbee coordinator malfunction. (Stick removed or damaged?)")
+    exit(41)
