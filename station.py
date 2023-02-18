@@ -1,16 +1,17 @@
-import timaccop
 import bmp2grays
-from Cryptodome.Cipher import AES
-from collections import namedtuple
-import struct
-import os
-import logging
-from PIL import Image
-import time
 import gzip
-import threading, concurrent.futures, traceback
 import json
+import logging
+import os
+import struct
 import subprocess
+import threading, concurrent.futures, traceback
+import timaccop
+import time
+
+from collections import namedtuple
+from Cryptodome.Cipher import AES
+from PIL import Image
 
 # config settings
 CONFIG_PATH = os.environ.get("CONFIG_PATH", default="./config.json")
