@@ -9,20 +9,62 @@ from PIL import Image
 import time
 import gzip
 import threading, concurrent.futures, traceback
+import json
 
-masterkey = bytearray.fromhex("D306D9348E29E5E358BF2934812002C1")
+# config settings
+CONFIG_PATH = os.environ.get("CONFIG_PATH", default="./config.json")
+config = {}
 
-PORT = os.environ.get("EPS_PORT", default="/dev/ttyACM0")
-EXTENDED_ADDRESS = [ int(addr.strip(), 16) for addr in os.environ.get("EPS_EXTENDED_ADDRESS", default="0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35").split(",") ]
-PANID = [ int(panid.strip(), 16) for panid in os.environ.get("EPS_PANID", default="0x47, 0x44").split(",") ]
-CHANNEL = int(os.environ.get("EPS_CHANNEL", default="11"))
-IMAGE_DIR = os.environ.get("EPS_IMAGE_DIR", default="./")
-IMAGE_WORKDIR = os.environ.get("EPS_IMAGE_WORKDIR", default="/tmp/")
+# catch missing or invalid config file
+if not os.path.isfile(CONFIG_PATH): 
+    print(f"config file does not exist ({CONFIG_PATH})")
+    os.exit(22)
 
-CHECKIN_DELAY = int(os.environ.get("EPS_CHECKIN_DELAY", default="900000")) # 900s
-RETRY_DELAY = int(os.environ.get("EPS_RETRY_DELAY", default="1000")) # 1s
-FAILED_CHECKINS_TILL_BLANK = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_BLANK", default="2"))
-FAILED_CHECKINS_TILL_DISSOC = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_DISSOC", default="2"))
+# load configuration file from config.json
+with open(CONFIG_PATH, 'r') as f: 
+    try:   
+        config = json.load(f)
+    except ValueError as err:
+        print(f"config file ({CONFIG_PATH}) is not valid. ({err})")
+        os.exit(23)
+
+# path settings
+IMAGE_DIR = os.environ.get("EPS_IMAGE_DIR", default=config["station"]["imagedir"])
+IMAGE_WORKDIR = os.environ.get("EPS_IMAGE_WORKDIR", default=config["station"]["workdir"])
+CREATE_WORKDIR = os.environ.get("CREATE_WORKDIR", default=config["station"]["createWorkdirIfNotExists"])
+CREATE_IMGDIR = os.environ.get("CREATE_IMGDIR", default=config["station"]["createImagedirIfNotExists"])
+
+# hardware settings
+PORT = os.environ.get("EPS_PORT", default=config["station"]["zigbeeCoordinatorInterface"])
+
+# zigbee settings
+MASTER_KEY = os.environ.get("MASTER_KEY", default=config["station"]["zigbeeMasterKey"])
+EXTENDED_ADDRESS = [ int(addr.strip(), 16) for addr in os.environ.get("EPS_EXTENDED_ADDRESS", default=config["station"]["extendedAddress"]).split(",") ]
+PANID = [ int(panid.strip(), 16) for panid in os.environ.get("EPS_PANID", default=config["station"]["panID"]).split(",") ]
+CHANNEL = int(os.environ.get("EPS_CHANNEL", default=config["station"]["zigbeeChannel"]))
+
+# timing settings
+CHECKIN_DELAY = int(os.environ.get("EPS_CHECKIN_DELAY", default=config["station"]["checkinDelayMs"]))
+RETRY_DELAY = int(os.environ.get("EPS_RETRY_DELAY", default=config["station"]["retryDelayMs"]))
+FAILED_CHECKINS_TILL_BLANK = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_BLANK", default=config["station"]["failedCheckinsTillBlank"]))
+FAILED_CHECKINS_TILL_DISSOC = int(os.environ.get("EPS_FAILED_CHECKINS_TILL_DISSOC", default=config["station"]["failedCheckinsTillDisassociate"]))
+
+# check for and create missing directories if create options are set
+if not os.path.exists(IMAGE_DIR):
+    if CREATE_IMGDIR:
+        os.makedirs(IMAGE_DIR)
+    else:
+        print(f"configured image directory ({IMAGE_DIR}) does not exist.")
+        os.exit(24)
+
+if not os.path.exists(IMAGE_WORKDIR):
+    if CREATE_WORKDIR:
+        os.makedirs(IMAGE_WORKDIR)
+    else:
+        print(f"configured working directory ({IMAGE_WORKDIR}) does not exist.")
+        os.exit(25)
+
+masterkey = bytearray.fromhex(MASTER_KEY) # 32 Byte hex string ( -> 16 Byte bytearray)
 
 PKT_ASSOC_REQ			= (0xF0)
 PKT_ASSOC_RESP			= (0xF1)

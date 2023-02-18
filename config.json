@@ -1,0 +1,17 @@
+{
+    "station":{
+        "checkinDelayMs": "30000",
+        "retryDelayMs": "600000",
+        "failedCheckinsTillBlank": "100",
+        "failedCheckinsTillDisassociate": "200",
+        "zigbeeChannel": "11",
+        "panID":"0x47, 0x44",
+        "extendedAddress":"0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35",
+        "zigbeeCoordinatorInterface":"/dev/ttyACM1",
+        "zigbeeMasterKey": "D306D9348E29E5E358BF2934812002C1",
+        "createWorkdirIfNotExists": false,
+        "createImagedirIfNotExists": false,
+        "imagedir": "./",
+        "workdir": "/tmp/"
+    }
+}
