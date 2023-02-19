@@ -23,9 +23,14 @@ python3 station.py
 ```
 
 ## Docker
+### Build your own
 ```
 docker build -t epaper-station:latest .
 docker run --device=/dev/<tty>:/dev/<tty> -e EPS_PORT=/dev/<tty> epaper-station
+```
+### Use prebuilt image
+```
+docker run --device=/dev/<tty>:/dev/<tty> -e EPS_PORT=/dev/<tty> ghcr.io/danielkucera/epaper-station:master
 ```
 
 ## Usage
