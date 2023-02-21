@@ -34,7 +34,7 @@ config_mapping = {
     "CREATE_WORKDIR":               {"env_name": "EPS_CREATE_WORKDIR",              "config": "configuration.storage.workingDirectory.createIfMissing",     "env_formatter": bool_formatter},
 
     # hardware settings
-    "PORT":                         {"env_name": "EPS_PORT",                        "config": "configuration.zigbeeConfiguration.coordinatorInterface"},
+    "PORT":                         {"env_name": "EPS_PORT",                        "config": "configuration.zigbeeConfiguration.interfacePort"},
 
     # zigbee settings
     "MASTER_KEY":                   {"env_name": "EPS_MASTER_KEY",                  "config": "configuration.zigbeeConfiguration.masterKey"},
@@ -618,9 +618,9 @@ masterkey = bytearray.fromhex(config['MASTER_KEY'])
 
 try:
     timaccop.init(config['PORT'], config['PANID'], config['CHANNEL'], config['EXTENDED_ADDRESS'], process_pkt)
-except Exception as e:  # graceful exit on missing or misconfigured coordinator stick
+except Exception as e:  # graceful exit on missing or misconfigured stick
     print(
-        f"Coordinator init failed. (Wrong interface configured ({config['PORT']}), coordinator not properly connected or missing dialout privileges?)")
+        f"Coordinator init failed. (Wrong interface configured ({config['PORT']}), stick not properly connected or missing dialout privileges?)")
     os._exit(29) # not using exit function, we have not initialized yet
 
 bmp_evt = threading.Event()
@@ -636,5 +636,5 @@ except KeyboardInterrupt:
     print("stopped by SIGINT")
     exit(0)
 except Exception as e:
-    print("Zigbee coordinator malfunction. (Stick removed or damaged?)")
+    print("Zigbee stick malfunction. (Stick removed or damaged?)")
     exit(41)
