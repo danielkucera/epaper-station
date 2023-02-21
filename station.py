@@ -28,31 +28,30 @@ config_path = os.environ.get("CONFIG_PATH", default="./config.yaml")
 # evironment variable mappings
 config_mapping = {
     # path settings
-    "IMAGE_DIR":                    {"env_name": "EPS_IMAGE_DIR",                   "config": "Configuration > Storage > Image directory > path"},
-    "IMAGE_WORKDIR":                {"env_name": "EPS_IMAGE_WORKDIR",               "config": "Configuration > Storage > Working directory > path"},
-    "CREATE_IMGDIR":                {"env_name": "EPS_CREATE_IMGDIR",               "config": "Configuration > Storage > Image directory > create if missing",       "env_formatter": bool_formatter},
-    "CREATE_WORKDIR":               {"env_name": "EPS_CREATE_WORKDIR",              "config": "Configuration > Storage > Working directory > create if missing",     "env_formatter": bool_formatter},
+    "IMAGE_DIR":                    {"env_name": "EPS_IMAGE_DIR",                   "config": "configuration.storage.imageDirectory.path"},
+    "IMAGE_WORKDIR":                {"env_name": "EPS_IMAGE_WORKDIR",               "config": "configuration.storage.workingDirectory.path"},
+    "CREATE_IMGDIR":                {"env_name": "EPS_CREATE_IMGDIR",               "config": "configuration.storage.imageDirectory.createIfMissing",       "env_formatter": bool_formatter},
+    "CREATE_WORKDIR":               {"env_name": "EPS_CREATE_WORKDIR",              "config": "configuration.storage.workingDirectory.createIfMissing",     "env_formatter": bool_formatter},
 
     # hardware settings
-    "PORT":                         {"env_name": "EPS_PORT",                        "config": "Configuration > Zigbee configuration > coordinator interface"},
+    "PORT":                         {"env_name": "EPS_PORT",                        "config": "configuration.zigbeeConfiguration.coordinatorInterface"},
 
     # zigbee settings
-    "MASTER_KEY":                   {"env_name": "EPS_MASTER_KEY",                  "config": "Configuration > Zigbee configuration > master key"},
-    "EXTENDED_ADDRESS":             {"env_name": "EPS_EXTENDED_ADDRESS",            "config": "Configuration > Zigbee configuration > extended address",             "env_formatter": address_formatter},
-    "PANID":                        {"env_name": "EPS_PANID",                       "config": "Configuration > Zigbee configuration > pan ID",                       "env_formatter": address_formatter},
-    "CHANNEL":                      {"env_name": "EPS_CHANNEL",                     "config": "Configuration > Zigbee configuration > channel",                      "env_formatter": int},
+    "MASTER_KEY":                   {"env_name": "EPS_MASTER_KEY",                  "config": "configuration.zigbeeConfiguration.masterKey"},
+    "EXTENDED_ADDRESS":             {"env_name": "EPS_EXTENDED_ADDRESS",            "config": "configuration.zigbeeConfiguration.extendedAddress",             "env_formatter": address_formatter},
+    "PANID":                        {"env_name": "EPS_PANID",                       "config": "configuration.zigbeeConfiguration.panId",                       "env_formatter": address_formatter},
+    "CHANNEL":                      {"env_name": "EPS_CHANNEL",                     "config": "configuration.zigbeeConfiguration.channel",                      "env_formatter": int},
 
     # timing settings
-    "CHECKIN_DELAY":                {"env_name": "EPS_CHECKIN_DELAY",               "config": "Configuration > Tag setup > checkin interval in ms",                  "env_formatter": int},
-    "RETRY_DELAY":                  {"env_name": "EPS_RETRY_DELAY",                 "config": "Configuration > Tag setup > retry interval in ms",                    "env_formatter": int},
-    "FAILED_CHECKINS_TILL_BLANK":   {"env_name": "EPS_FAILED_CHECKINS_TILL_BLANK",  "config": "Configuration > Tag setup > failed checkins till blank",              "env_formatter": int},
-    "FAILED_CHECKINS_TILL_DISSOC":  {"env_name": "EPS_FAILED_CHECKINS_TILL_DISSOC", "config": "Configuration > Tag setup > failed checkins till disassociate",       "env_formatter": int},
+    "CHECKIN_DELAY":                {"env_name": "EPS_CHECKIN_DELAY",               "config": "configuration.tagSetup.checkinIntervalInMs",                  "env_formatter": int},
+    "RETRY_DELAY":                  {"env_name": "EPS_RETRY_DELAY",                 "config": "configuration.tagSetup.retryIntervalInMs",                    "env_formatter": int},
+    "FAILED_CHECKINS_TILL_BLANK":   {"env_name": "EPS_FAILED_CHECKINS_TILL_BLANK",  "config": "configuration.tagSetup.failedCheckinsTillBlank",              "env_formatter": int},
+    "FAILED_CHECKINS_TILL_DISSOC":  {"env_name": "EPS_FAILED_CHECKINS_TILL_DISSOC", "config": "configuration.tagSetup.failedCheckinsTillDisassociate",       "env_formatter": int},
 
     # image generation config
-    "IMGGEN_COMMAND":               {"env_name": "EPS_IMGGEN_COMMAND",              "config": "Configuration > External image generation command > command"},
-    "IMGGEN_INTERVAL":              {"env_name": "EPS_IMGGEN_INTERVAL",             "config": "Configuration > External image generation command > interval in ms",  "env_formatter": int}
+    "IMGGEN_COMMAND":               {"env_name": "EPS_IMGGEN_COMMAND",              "config": "configuration.externalImageGenerationCommand.command"},
+    "IMGGEN_INTERVAL":              {"env_name": "EPS_IMGGEN_INTERVAL",             "config": "configuration.externalImageGenerationCommand.intervalInMs",  "env_formatter": int}
 }
-
 
 PKT_ASSOC_REQ = (0xF0)
 PKT_ASSOC_RESP = (0xF1)
@@ -210,7 +209,7 @@ def load_config(config_mapping, config_path):
             else:
                 temp_config[key] = env_value
             continue
-        temp_config[key] = get_element_by_path(raw_config,element["config"].split(" > "))
+        temp_config[key] = get_element_by_path(raw_config,element["config"].split("."))
     return temp_config
 
 
