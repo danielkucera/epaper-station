@@ -173,10 +173,25 @@ def get_element_by_path(object, keys):
         return get_element_by_path(object[keys[0]], keys[1:])
     return object
 
-
-# generate config object from config mapping and config file
-def config_generator(config_mapping, config_file):
+# generate config object from config mapping and config file path
+def load_config(config_mapping, config_path):
     temp_config = {}
+    # catch missing or invalid config file
+    if not os.path.isfile(config_path):
+        print(f"config file does not exist ({config_path})")
+        os._exit(4)
+    raw_config = {}
+    # load configuration file from config.json
+    with open(config_path, 'r') as f:
+        try:
+            raw_config = yaml.load(f, yaml.Loader)
+        except ValueError as err:
+            print(f"config file ({config_path}) is not valid. ({err})")
+            os._exit(5)
+        except yaml.scanner.ScannerError as err:
+            print(f"config file ({config_path}) is not valid. ({err})")
+            os._exit(6)
+            
     for key in config_mapping:
         element = config_mapping[key]
         env_value = None
@@ -195,27 +210,8 @@ def config_generator(config_mapping, config_file):
             else:
                 temp_config[key] = env_value
             continue
-        temp_config[key] = get_element_by_path(config_file,element["config"].split(" > "))
+        temp_config[key] = get_element_by_path(raw_config,element["config"].split(" > "))
     return temp_config
-
-# generate config object from config mapping and config file path
-def load_config(config_mapping, config_path):
-    # catch missing or invalid config file
-    if not os.path.isfile(config_path):
-        print(f"config file does not exist ({config_path})")
-        os._exit(4)
-    raw_config = {}
-    # load configuration file from config.json
-    with open(config_path, 'r') as f:
-        try:
-            raw_config = yaml.load(f, yaml.Loader)
-        except ValueError as err:
-            print(f"config file ({config_path}) is not valid. ({err})")
-            os._exit(5)
-        except yaml.scanner.ScannerError as err:
-            print(f"config file ({config_path}) is not valid. ({err})")
-            os._exit(6)
-    return config_generator(config_mapping, raw_config)
 
 
 def exit(exitCode=0):
