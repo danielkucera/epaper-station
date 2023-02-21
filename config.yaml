@@ -24,9 +24,3 @@ configuration:
     extendedAddress: [0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35] # 64 bit MAC address for the station
     coordinatorInterface: "/dev/ttyACM1" # Serial interface of the zigbee stick (COM port)
     masterKey: "D306D9348E29E5E358BF2934812002C1" # Master key for the zigbee coordinator, 32 hex char (16 byte) long
-
-  # Command that gets executed every x milliseconds whilst the station is running.
-  # Will only run if command is not empty and interval > 0.
-  externalImageGenerationCommand: 
-    command: "" # Command to execute
-    intervalInMs: 0 # Interval of execution in milliseconds

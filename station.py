@@ -38,19 +38,15 @@ config_mapping = {
 
     # zigbee settings
     "MASTER_KEY":                   {"env_name": "EPS_MASTER_KEY",                  "config": "configuration.zigbeeConfiguration.masterKey"},
-    "EXTENDED_ADDRESS":             {"env_name": "EPS_EXTENDED_ADDRESS",            "config": "configuration.zigbeeConfiguration.extendedAddress",             "env_formatter": address_formatter},
-    "PANID":                        {"env_name": "EPS_PANID",                       "config": "configuration.zigbeeConfiguration.panId",                       "env_formatter": address_formatter},
-    "CHANNEL":                      {"env_name": "EPS_CHANNEL",                     "config": "configuration.zigbeeConfiguration.channel",                      "env_formatter": int},
+    "EXTENDED_ADDRESS":             {"env_name": "EPS_EXTENDED_ADDRESS",            "config": "configuration.zigbeeConfiguration.extendedAddress",          "env_formatter": address_formatter},
+    "PANID":                        {"env_name": "EPS_PANID",                       "config": "configuration.zigbeeConfiguration.panId",                    "env_formatter": address_formatter},
+    "CHANNEL":                      {"env_name": "EPS_CHANNEL",                     "config": "configuration.zigbeeConfiguration.channel",                  "env_formatter": int},
 
     # timing settings
-    "CHECKIN_DELAY":                {"env_name": "EPS_CHECKIN_DELAY",               "config": "configuration.tagSetup.checkinIntervalInMs",                  "env_formatter": int},
-    "RETRY_DELAY":                  {"env_name": "EPS_RETRY_DELAY",                 "config": "configuration.tagSetup.retryIntervalInMs",                    "env_formatter": int},
-    "FAILED_CHECKINS_TILL_BLANK":   {"env_name": "EPS_FAILED_CHECKINS_TILL_BLANK",  "config": "configuration.tagSetup.failedCheckinsTillBlank",              "env_formatter": int},
-    "FAILED_CHECKINS_TILL_DISSOC":  {"env_name": "EPS_FAILED_CHECKINS_TILL_DISSOC", "config": "configuration.tagSetup.failedCheckinsTillDisassociate",       "env_formatter": int},
-
-    # image generation config
-    "IMGGEN_COMMAND":               {"env_name": "EPS_IMGGEN_COMMAND",              "config": "configuration.externalImageGenerationCommand.command"},
-    "IMGGEN_INTERVAL":              {"env_name": "EPS_IMGGEN_INTERVAL",             "config": "configuration.externalImageGenerationCommand.intervalInMs",  "env_formatter": int}
+    "CHECKIN_DELAY":                {"env_name": "EPS_CHECKIN_DELAY",               "config": "configuration.tagSetup.checkinIntervalInMs",                 "env_formatter": int},
+    "RETRY_DELAY":                  {"env_name": "EPS_RETRY_DELAY",                 "config": "configuration.tagSetup.retryIntervalInMs",                   "env_formatter": int},
+    "FAILED_CHECKINS_TILL_BLANK":   {"env_name": "EPS_FAILED_CHECKINS_TILL_BLANK",  "config": "configuration.tagSetup.failedCheckinsTillBlank",             "env_formatter": int},
+    "FAILED_CHECKINS_TILL_DISSOC":  {"env_name": "EPS_FAILED_CHECKINS_TILL_DISSOC", "config": "configuration.tagSetup.failedCheckinsTillDisassociate",      "env_formatter": int},
 }
 
 PKT_ASSOC_REQ = (0xF0)
@@ -216,8 +212,6 @@ def load_config(config_mapping, config_path):
 def exit(exitCode=0):
     bmp_evt.set()
     bmp_thr.join()
-    if len(config['IMGGEN_COMMAND']) > 1 and config['IMGGEN_INTERVAL'] > 0:
-        imggen_thr.cancel()
     print('Station stopped')
     os._exit(exitCode)
 
@@ -604,18 +598,6 @@ def bmp_poller(evt):
                         print(f'{bfup} processed {data}')
     print('bmp_poller exit now')
 
-# function that gets called on image generation cycle
-
-def generateImages():
-    print("running image generator")
-    subprocess.run(config['IMGGEN_COMMAND'].split(" "))
-
-
-class RepeatTimer(threading.Timer):
-    def run(self):
-        while not self.finished.wait(self.interval):
-            self.function(*self.args, **self.kwargs)
-
 config = load_config(config_mapping, config_path)
 
 if not os.path.exists(config['IMAGE_DIR']):
@@ -643,14 +625,6 @@ except Exception as e:  # graceful exit on missing or misconfigured coordinator 
 
 bmp_evt = threading.Event()
 bmp_thr = threading.Thread(target=bmp_poller, args=(bmp_evt,))
-# image generation thread init
-imggen_thr = None
-if len(config['IMGGEN_COMMAND']) > 1 and config['IMGGEN_INTERVAL'] > 0:
-    print(
-        f"external image generator ({config['IMGGEN_COMMAND']}) will be called every {config['IMGGEN_INTERVAL']/1000} seconds")
-    imggen_thr = RepeatTimer(config['IMGGEN_INTERVAL']/1000, generateImages)
-    generateImages()
-    imggen_thr.start()
 
 bmp_thr.start()
 
