@@ -77,6 +77,7 @@ def await_res():
     #print("R:", (bytes([pre])+frm+bytes([cs])).hex())
     if cs != ccs:
         print("incorrect fcs, expected", ccs, "got", cs)
+        return
     return frm
 
 def send_sreq(data):
