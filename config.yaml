@@ -1,0 +1,26 @@
+%YAML 1.2
+---
+configuration:
+  # Storage setup
+  storage:
+    imageDirectory: # Location where tag images are stored
+      path: "./" # Relative or absolute path
+      createIfMissing: false # Create the folder if it does not exist 
+    workingDirectory: # Location where temporary files are stored
+      path: "/tmp/" # Relative or absolute path 
+      createIfMissing: false # Create the folder if it does not exist
+
+  # Options for the tags 
+  tagSetup:
+    checkinIntervalInMs: 900000 # Interval in milliseconds the tags ask for new images
+    retryIntervalInMs: 1000 # Interval in milliseconds the tags should retry to connect to the station
+    failedCheckinsTillBlank: 2 # Checkin retry count after which the tags will go blank
+    failedCheckinsTillDisassociate: 2 # Checkin retry count after which the tags will reeenter associate mode
+
+  # Configuration for the zigbee stick, zigbee network and encryption
+  zigbeeConfiguration:
+    channel: 11 # Zigbee channel, (11-26 in the 2.4GHz band) choose whichever you achieve best signal stability with
+    panId: [0x47, 0x44] # 16 bit network id, all devices in the same network should use the same
+    extendedAddress: [0x00, 0x12, 0x4B, 0x00, 0x14, 0xD9, 0x49, 0x35] # 64 bit MAC address for the station
+    interfacePort: "/dev/ttyACM0" # Serial interface of the zigbee stick (COM port)
+    masterKey: "D306D9348E29E5E358BF2934812002C1" # Master key for the zigbee communication, 32 hex char (16 byte) long
